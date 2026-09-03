@@ -8,6 +8,7 @@ Goal.com から日本代表の試合日程・放送予定を取得して matches
 import json
 import os
 import re
+import sys
 from bs4 import BeautifulSoup
 
 URL = "https://www.goal.com/jp/ニュース/japan-national-team-schedule-broadcast/1oyzx47bv2f6p1lcdsrtkc89s8"
@@ -191,5 +192,63 @@ def detect_new_broadcasts(old_matches: list, new_matches: list) -> list:
     return new_broadcasts
 
 
+def fetch_soup(url: str):
+    import requests
+    from bs4 import BeautifulSoup
+
+    headers = {
+        "User-Agent": (
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/124.0.0.0 Safari/537.36"
+        ),
+        "Accept-Language": "ja,en;q=0.9",
+    }
+    res = requests.get(url, headers=headers, timeout=30)
+    res.raise_for_status()
+    res.encoding = "utf-8"
+    return BeautifulSoup(res.text, "html.parser")
+
+
+def load_old_matches() -> list:
+    if not os.path.exists(OUTPUT_FILE):
+        return []
+    with open(OUTPUT_FILE, encoding="utf-8") as f:
+        return json.load(f)
+
+
+def save_matches(matches: list):
+    with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
+        json.dump(matches, f, ensure_ascii=False, indent=2)
+
+
+def print_new_broadcasts(new_broadcasts: list):
+    if not new_broadcasts:
+        print("新着の放送予定はありません。")
+        return
+    print(f"新しく放送予定が確定した試合が {len(new_broadcasts)} 件あります:")
+    for m in new_broadcasts:
+        stations = m["tv_onair"] + m["tv_bs"] + m["tv_net"]
+        print(f"  {m['date']} {m['time']}〜 {m['team1']} vs {m['team2']}"
+              f"（{m['stage']}） {'・'.join(stations)}")
+
+
+def main() -> list:
+    print(f"取得中: {URL}")
+    soup = fetch_soup(URL)
+
+    schedule = parse_schedule_table(soup)
+    broadcasts = parse_broadcast_table(soup)
+    new_matches = merge_matches(schedule, broadcasts)
+
+    old_matches = load_old_matches()
+    new_broadcasts = detect_new_broadcasts(old_matches, new_matches)
+
+    save_matches(new_matches)
+    print(f"{OUTPUT_FILE} を更新しました（{len(new_matches)}試合）")
+    print_new_broadcasts(new_broadcasts)
+    return new_broadcasts
+
+
 if __name__ == "__main__":
-    pass
+    main()
