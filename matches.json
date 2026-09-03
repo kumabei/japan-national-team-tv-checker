@@ -1,8 +1,248 @@
 [
   {
+    "date": "11/16",
+    "time": "19:00",
+    "stage": "ワールドカップ アジア最終予選 ワールドカップ予選AFC第2ラウンドグループ。 B",
+    "team1": "日本",
+    "team2": "ミャンマー",
+    "tv_onair": [],
+    "tv_bs": [],
+    "tv_net": [],
+    "is_japan": true,
+    "score": {
+      "home": 5,
+      "away": 0
+    }
+  },
+  {
+    "date": "11/21",
+    "time": "23:45",
+    "stage": "ワールドカップ アジア最終予選 ワールドカップ予選AFC第2ラウンドグループ。 B",
+    "team1": "シリア",
+    "team2": "日本",
+    "tv_onair": [],
+    "tv_bs": [],
+    "tv_net": [],
+    "is_japan": true,
+    "score": {
+      "home": 0,
+      "away": 5
+    }
+  },
+  {
+    "date": "3/21",
+    "time": "19:23",
+    "stage": "ワールドカップ アジア最終予選 ワールドカップ予選AFC第2ラウンドグループ。 B",
+    "team1": "日本",
+    "team2": "朝鮮民主主義人民共和国",
+    "tv_onair": [],
+    "tv_bs": [],
+    "tv_net": [],
+    "is_japan": true,
+    "score": {
+      "home": 1,
+      "away": 0
+    }
+  },
+  {
+    "date": "3/26",
+    "time": "17:00",
+    "stage": "ワールドカップ アジア最終予選 ワールドカップ予選AFC第2ラウンドグループ。 B",
+    "team1": "朝鮮民主主義人民共和国",
+    "team2": "日本",
+    "tv_onair": [],
+    "tv_bs": [],
+    "tv_net": [],
+    "is_japan": true,
+    "score": {
+      "home": 0,
+      "away": 3
+    }
+  },
+  {
+    "date": "6/6",
+    "time": "21:10",
+    "stage": "ワールドカップ アジア最終予選 ワールドカップ予選AFC第2ラウンドグループ。 B",
+    "team1": "ミャンマー",
+    "team2": "日本",
+    "tv_onair": [],
+    "tv_bs": [],
+    "tv_net": [],
+    "is_japan": true,
+    "score": {
+      "home": 0,
+      "away": 5
+    }
+  },
+  {
+    "date": "6/11",
+    "time": "19:14",
+    "stage": "ワールドカップ アジア最終予選 ワールドカップ予選AFC第2ラウンドグループ。 B",
+    "team1": "日本",
+    "team2": "シリア",
+    "tv_onair": [],
+    "tv_bs": [],
+    "tv_net": [],
+    "is_japan": true,
+    "score": {
+      "home": 5,
+      "away": 0
+    }
+  },
+  {
+    "date": "9/5",
+    "time": "19:35",
+    "stage": "ワールドカップ アジア最終予選 ワールドカップ予選AFC第3ラウンドグループ。 C",
+    "team1": "日本",
+    "team2": "中国",
+    "tv_onair": [],
+    "tv_bs": [],
+    "tv_net": [],
+    "is_japan": true,
+    "score": {
+      "home": 7,
+      "away": 0
+    }
+  },
+  {
+    "date": "9/11",
+    "time": "01:00",
+    "stage": "ワールドカップ アジア最終予選 ワールドカップ予選AFC第3ラウンドグループ。 C",
+    "team1": "バーレーン",
+    "team2": "日本",
+    "tv_onair": [],
+    "tv_bs": [],
+    "tv_net": [],
+    "is_japan": true,
+    "score": {
+      "home": 0,
+      "away": 5
+    }
+  },
+  {
+    "date": "10/11",
+    "time": "03:00",
+    "stage": "ワールドカップ アジア最終予選 ワールドカップ予選AFC第3ラウンドグループ。 C",
+    "team1": "サウジアラビア",
+    "team2": "日本",
+    "tv_onair": [],
+    "tv_bs": [],
+    "tv_net": [],
+    "is_japan": true,
+    "score": {
+      "home": 0,
+      "away": 2
+    }
+  },
+  {
+    "date": "10/15",
+    "time": "19:35",
+    "stage": "ワールドカップ アジア最終予選 ワールドカップ予選AFC第3ラウンドグループ。 C",
+    "team1": "日本",
+    "team2": "オーストラリア",
+    "tv_onair": [],
+    "tv_bs": [],
+    "tv_net": [],
+    "is_japan": true,
+    "score": {
+      "home": 1,
+      "away": 1
+    }
+  },
+  {
+    "date": "11/15",
+    "time": "21:00",
+    "stage": "ワールドカップ アジア最終予選 ワールドカップ予選AFC第3ラウンドグループ。 C",
+    "team1": "インドネシア",
+    "team2": "日本",
+    "tv_onair": [],
+    "tv_bs": [],
+    "tv_net": [],
+    "is_japan": true,
+    "score": {
+      "home": 0,
+      "away": 4
+    }
+  },
+  {
+    "date": "11/19",
+    "time": "21:00",
+    "stage": "ワールドカップ アジア最終予選 ワールドカップ予選AFC第3ラウンドグループ。 C",
+    "team1": "中国",
+    "team2": "日本",
+    "tv_onair": [],
+    "tv_bs": [],
+    "tv_net": [],
+    "is_japan": true,
+    "score": {
+      "home": 1,
+      "away": 3
+    }
+  },
+  {
+    "date": "3/20",
+    "time": "19:35",
+    "stage": "ワールドカップ アジア最終予選 ワールドカップ予選AFC第3ラウンドグループ。 C",
+    "team1": "日本",
+    "team2": "バーレーン",
+    "tv_onair": [],
+    "tv_bs": [],
+    "tv_net": [],
+    "is_japan": true,
+    "score": {
+      "home": 2,
+      "away": 0
+    }
+  },
+  {
+    "date": "3/25",
+    "time": "19:35",
+    "stage": "ワールドカップ アジア最終予選 ワールドカップ予選AFC第3ラウンドグループ。 C",
+    "team1": "日本",
+    "team2": "サウジアラビア",
+    "tv_onair": [],
+    "tv_bs": [],
+    "tv_net": [],
+    "is_japan": true,
+    "score": {
+      "home": 0,
+      "away": 0
+    }
+  },
+  {
+    "date": "6/5",
+    "time": "20:10",
+    "stage": "ワールドカップ アジア最終予選 ワールドカップ予選AFC第3ラウンドグループ。 C",
+    "team1": "オーストラリア",
+    "team2": "日本",
+    "tv_onair": [],
+    "tv_bs": [],
+    "tv_net": [],
+    "is_japan": true,
+    "score": {
+      "home": 1,
+      "away": 0
+    }
+  },
+  {
+    "date": "6/10",
+    "time": "19:35",
+    "stage": "ワールドカップ アジア最終予選 ワールドカップ予選AFC第3ラウンドグループ。 C",
+    "team1": "日本",
+    "team2": "インドネシア",
+    "tv_onair": [],
+    "tv_bs": [],
+    "tv_net": [],
+    "is_japan": true,
+    "score": {
+      "home": 6,
+      "away": 0
+    }
+  },
+  {
     "date": "3/29",
     "time": "02:00",
-    "stage": "国際親善試合",
+    "stage": "親善試合",
     "team1": "スコットランド",
     "team2": "日本",
     "tv_onair": [],
@@ -17,7 +257,7 @@
   {
     "date": "4/1",
     "time": "03:45",
-    "stage": "国際親善試合",
+    "stage": "親善試合",
     "team1": "イングランド",
     "team2": "日本",
     "tv_onair": [],
@@ -32,7 +272,7 @@
   {
     "date": "5/31",
     "time": "19:25",
-    "stage": "キリンチャレンジカップ2026",
+    "stage": "親善試合",
     "team1": "日本",
     "team2": "アイスランド",
     "tv_onair": [],
@@ -47,7 +287,7 @@
   {
     "date": "6/15",
     "time": "05:00",
-    "stage": "FIFAワールドカップ2026 グループステージ第1節",
+    "stage": "ワールドカップ グループ。 F",
     "team1": "オランダ",
     "team2": "日本",
     "tv_onair": [],
@@ -62,7 +302,7 @@
   {
     "date": "6/21",
     "time": "13:00",
-    "stage": "FIFAワールドカップ2026 グループステージ第2節",
+    "stage": "ワールドカップ グループ。 F",
     "team1": "チュニジア",
     "team2": "日本",
     "tv_onair": [],
@@ -77,7 +317,7 @@
   {
     "date": "6/26",
     "time": "08:00",
-    "stage": "FIFAワールドカップ2026 グループステージ第3節",
+    "stage": "ワールドカップ グループ。 F",
     "team1": "日本",
     "team2": "スウェーデン",
     "tv_onair": [],
@@ -92,7 +332,7 @@
   {
     "date": "6/30",
     "time": "02:00",
-    "stage": "FIFAワールドカップ2026 ラウンド32",
+    "stage": "ワールドカップ 決勝ステージ",
     "team1": "ブラジル",
     "team2": "日本",
     "tv_onair": [
@@ -109,5 +349,41 @@
       "home": 2,
       "away": 1
     }
+  },
+  {
+    "date": "1/11",
+    "time": "23:00",
+    "stage": "AFC アジアカップ アジアカップグループ。 F",
+    "team1": "日本",
+    "team2": "インドネシア",
+    "tv_onair": [],
+    "tv_bs": [],
+    "tv_net": [],
+    "is_japan": true,
+    "score": null
+  },
+  {
+    "date": "1/16",
+    "time": "23:00",
+    "stage": "AFC アジアカップ アジアカップグループ。 F",
+    "team1": "タイ王国",
+    "team2": "日本",
+    "tv_onair": [],
+    "tv_bs": [],
+    "tv_net": [],
+    "is_japan": true,
+    "score": null
+  },
+  {
+    "date": "1/20",
+    "time": "23:00",
+    "stage": "AFC アジアカップ アジアカップグループ。 F",
+    "team1": "日本",
+    "team2": "カタール",
+    "tv_onair": [],
+    "tv_bs": [],
+    "tv_net": [],
+    "is_japan": true,
+    "score": null
   }
 ]

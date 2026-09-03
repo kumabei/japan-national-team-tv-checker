@@ -5,6 +5,7 @@
 Goal.com から日本代表の試合日程・放送予定を取得して matches.json を更新する。
 """
 
+import datetime
 import json
 import os
 import re
@@ -12,6 +13,10 @@ import sys
 from bs4 import BeautifulSoup
 
 URL = "https://www.goal.com/jp/ニュース/japan-national-team-schedule-broadcast/1oyzx47bv2f6p1lcdsrtkc89s8"
+TEAM_SCHEDULE_URL = (
+    "https://www.goal.com/jp/%E3%83%81%E3%83%BC%E3%83%A0/%E6%97%A5%E6%9C%AC/"
+    "%E6%97%A5%E7%A8%8B%E3%83%BB%E7%B5%90%E6%9E%9C/6duaxcbrofil112qfq4v895go"
+)
 OUTPUT_FILE = os.path.join(os.path.dirname(__file__), "matches.json")
 
 BROADCASTER_MAP = {
@@ -150,6 +155,45 @@ def parse_broadcast_table(soup) -> dict:
     return result
 
 
+def utc_iso_to_jst(iso_str: str):
+    dt_utc = datetime.datetime.fromisoformat(iso_str.replace("Z", "+00:00"))
+    dt_jst = dt_utc.astimezone(datetime.timezone(datetime.timedelta(hours=9)))
+    return f"{dt_jst.month}/{dt_jst.day}", f"{dt_jst.hour:02d}:{dt_jst.minute:02d}"
+
+
+def parse_next_data_matches(html: str) -> list:
+    m = re.search(
+        r'<script id="__NEXT_DATA__" type="application/json">(.*?)</script>',
+        html, re.S,
+    )
+    if not m:
+        return []
+    data = json.loads(m.group(1))
+    return data["props"]["pageProps"]["content"]["matches"]
+
+
+def convert_team_match(raw: dict):
+    date, time_str = utc_iso_to_jst(raw["startDate"])
+    team1 = raw["teamA"]["name"]
+    team2 = raw["teamB"]["name"]
+
+    competition_name = raw["competition"]["name"] if raw["competition"] else ""
+    round_name = raw["round"]["name"] if raw["round"] else None
+    if round_name and round_name != competition_name:
+        stage = f"{competition_name} {round_name}"
+    else:
+        stage = competition_name
+
+    entry = {
+        "date": date, "time": time_str, "stage": stage,
+        "team1": team1, "team2": team2,
+    }
+    if raw.get("score"):
+        entry["score1"] = raw["score"]["teamA"]
+        entry["score2"] = raw["score"]["teamB"]
+    return entry
+
+
 def merge_matches(schedule: list, broadcasts: dict) -> list:
     matches = []
     for entry in schedule:
@@ -210,6 +254,31 @@ def fetch_soup(url: str):
     return BeautifulSoup(res.text, "html.parser")
 
 
+def fetch_team_matches(url: str) -> list:
+    import requests
+
+    headers = {
+        "User-Agent": (
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/124.0.0.0 Safari/537.36"
+        ),
+        "Accept-Language": "ja,en;q=0.9",
+    }
+    res = requests.get(url, headers=headers, timeout=30)
+    res.raise_for_status()
+    res.encoding = "utf-8"
+
+    matches = []
+    for raw in parse_next_data_matches(res.text):
+        team1 = raw["teamA"]["name"]
+        team2 = raw["teamB"]["name"]
+        if not any(name in team1 or name in team2 for name in JAPAN_NAMES):
+            continue
+        matches.append(convert_team_match(raw))
+    return matches
+
+
 def load_old_matches() -> list:
     if not os.path.exists(OUTPUT_FILE):
         return []
@@ -234,11 +303,13 @@ def print_new_broadcasts(new_broadcasts: list):
 
 
 def main() -> list:
+    print(f"取得中: {TEAM_SCHEDULE_URL}")
+    schedule = fetch_team_matches(TEAM_SCHEDULE_URL)
+
     print(f"取得中: {URL}")
     soup = fetch_soup(URL)
-
-    schedule = parse_schedule_table(soup)
     broadcasts = parse_broadcast_table(soup)
+
     new_matches = merge_matches(schedule, broadcasts)
 
     old_matches = load_old_matches()

@@ -13,6 +13,9 @@ from scraper import (
     parse_broadcast_table,
     merge_matches,
     detect_new_broadcasts,
+    utc_iso_to_jst,
+    parse_next_data_matches,
+    convert_team_match,
 )
 
 
@@ -165,3 +168,79 @@ def test_detect_new_broadcasts_ignores_matches_still_without_broadcast():
     old = [_match("10/5", "19:00", "未定")]
     new = [_match("10/5", "19:00", "未定")]
     assert detect_new_broadcasts(old, new) == []
+
+
+def test_utc_iso_to_jst_same_day():
+    assert utc_iso_to_jst("2027-01-11T14:00:00.000Z") == ("1/11", "23:00")
+
+
+def test_utc_iso_to_jst_crosses_to_next_day():
+    assert utc_iso_to_jst("2026-06-25T23:00:00.000Z") == ("6/26", "08:00")
+
+
+NEXT_DATA_HTML = """
+<html><body>
+<script id="__NEXT_DATA__" type="application/json">
+{"props": {"pageProps": {"content": {"matches": [
+  {"startDate": "2026-06-25T23:00:00.000Z",
+   "competition": {"name": "ワールドカップ"},
+   "round": {"name": "グループ F"},
+   "teamA": {"name": "日本"}, "teamB": {"name": "スウェーデン"},
+   "score": {"teamA": 1, "teamB": 1}, "status": "RESULT"},
+  {"startDate": "2027-01-11T14:00:00.000Z",
+   "competition": {"name": "AFC アジアカップ"},
+   "round": null,
+   "teamA": {"name": "日本"}, "teamB": {"name": "インドネシア"},
+   "score": null, "status": "FIXTURE"}
+]}}}}
+</script>
+</body></html>
+"""
+
+
+def test_parse_next_data_matches_extracts_raw_list():
+    raw = parse_next_data_matches(NEXT_DATA_HTML)
+    assert len(raw) == 2
+    assert raw[0]["teamA"]["name"] == "日本"
+
+
+def test_convert_team_match_with_result_and_round():
+    raw = {
+        "startDate": "2026-06-25T23:00:00.000Z",
+        "competition": {"name": "ワールドカップ"},
+        "round": {"name": "グループ F"},
+        "teamA": {"name": "日本"}, "teamB": {"name": "スウェーデン"},
+        "score": {"teamA": 1, "teamB": 1}, "status": "RESULT",
+    }
+    result = convert_team_match(raw)
+    assert result == {
+        "date": "6/26", "time": "08:00", "stage": "ワールドカップ グループ F",
+        "team1": "日本", "team2": "スウェーデン", "score1": 1, "score2": 1,
+    }
+
+
+def test_convert_team_match_omits_round_when_same_as_competition():
+    raw = {
+        "startDate": "2026-03-28T17:00:00.000Z",
+        "competition": {"name": "親善試合"},
+        "round": {"name": "親善試合"},
+        "teamA": {"name": "スコットランド"}, "teamB": {"name": "日本"},
+        "score": {"teamA": 1, "teamB": 0}, "status": "RESULT",
+    }
+    result = convert_team_match(raw)
+    assert result["stage"] == "親善試合"
+
+
+def test_convert_team_match_fixture_without_score_or_round():
+    raw = {
+        "startDate": "2027-01-11T14:00:00.000Z",
+        "competition": {"name": "AFC アジアカップ"},
+        "round": None,
+        "teamA": {"name": "日本"}, "teamB": {"name": "インドネシア"},
+        "score": None, "status": "FIXTURE",
+    }
+    result = convert_team_match(raw)
+    assert result == {
+        "date": "1/11", "time": "23:00", "stage": "AFC アジアカップ",
+        "team1": "日本", "team2": "インドネシア",
+    }
