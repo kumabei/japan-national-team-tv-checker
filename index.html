@@ -618,7 +618,7 @@ function buildList() {
   for (const group of DAYS) {
     const isToday = group.key === tk;
     html += `<div class="date-head" data-date="${group.key}">
-      <span class="d">${group.date}（${group.day}）</span>
+      <span class="d">${group.year}/${group.date}（${group.day}）</span>
       ${isToday ? `<span class="today-tag">TODAY</span>` : ""}
     </div>`;
 
@@ -712,7 +712,7 @@ function renderDayNav(scrollToTop = false) {
   const group = DAYS[dayIndex];
   const isToday = group.key === todayKey();
   document.getElementById("dayLabel").innerHTML =
-    `${group.date}（${group.day}）${isToday ? `<span class="today-tag" style="margin-left:6px;">TODAY</span>` : ""}`;
+    `${group.year}/${group.date}（${group.day}）${isToday ? `<span class="today-tag" style="margin-left:6px;">TODAY</span>` : ""}`;
   document.getElementById("prevDay").disabled = dayIndex <= 0;
   document.getElementById("nextDay").disabled = dayIndex >= DAYS.length - 1;
 
