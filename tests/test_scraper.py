@@ -2,12 +2,16 @@ import sys
 import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
+from bs4 import BeautifulSoup
 from scraper import (
     normalize_broadcaster,
     classify_broadcaster,
     parse_date_time,
     parse_schedule_card,
     parse_broadcast_text,
+    parse_schedule_table,
+    parse_broadcast_table,
+    merge_matches,
 )
 
 
@@ -62,3 +66,66 @@ def test_parse_broadcast_text_splits_tv_and_net():
 def test_parse_broadcast_text_dedupes():
     text = "【テレビ】 NHK BS(1:00~) NHK BSP4K(2:00~)"
     assert parse_broadcast_text(text) == ["NHK BS"]
+
+
+SCHEDULE_HTML = """
+<table>
+  <tr><th>試合日</th><th>大会</th><th>対戦カード</th><th>会場</th></tr>
+  <tr><td>6/30(火) 2:00</td><td>FIFAワールドカップ2026 ラウンド32</td>
+      <td>ブラジル 2-1 日本</td><td>ヒューストン・スタジアム （アメリカ）</td></tr>
+  <tr><td>9/24(木) 19:35</td><td>キリンチャレンジカップ2026</td>
+      <td>日本 - パラグアイ</td><td>キューアンドエースタジアム （宮城）</td></tr>
+  <tr><td>10/1(木) 未定</td><td>キリンカップサッカー2026</td>
+      <td>日本 - 未定</td><td>横浜国際総合競技場 （神奈川）</td></tr>
+</table>
+"""
+
+BROADCAST_HTML = """
+<table>
+  <tr><th>試合日</th><th>対戦カード</th><th>放送・配信予定</th></tr>
+  <tr><td>6/30(火) 2:00</td><td>ブラジル vs 日本</td>
+      <td>【テレビ】 フジテレビ系列(0:50～) NHK BS(1:10~) 【ネット】 DAZN(1:00~)</td></tr>
+</table>
+"""
+
+
+def test_parse_schedule_table_extracts_rows_and_skips_undetermined_date():
+    soup = BeautifulSoup(SCHEDULE_HTML, "html.parser")
+    rows = parse_schedule_table(soup)
+    assert len(rows) == 2  # 日程未定の1行はスキップされる
+    assert rows[0]["date"] == "6/30"
+    assert rows[0]["time"] == "02:00"
+    assert rows[0]["stage"] == "FIFAワールドカップ2026 ラウンド32"
+    assert rows[0]["team1"] == "ブラジル"
+    assert rows[0]["team2"] == "日本"
+    assert rows[0]["score1"] == 2
+    assert rows[1]["team2"] == "パラグアイ"
+
+
+def test_parse_broadcast_table_keys_by_date_time():
+    soup = BeautifulSoup(BROADCAST_HTML, "html.parser")
+    result = parse_broadcast_table(soup)
+    assert result[("6/30", "02:00")] == ["フジテレビ", "NHK BS", "DAZN"]
+
+
+def test_merge_matches_attaches_broadcasters_and_classifies():
+    schedule = [{"date": "6/30", "time": "02:00", "stage": "S",
+                 "team1": "ブラジル", "team2": "日本", "score1": 2, "score2": 1}]
+    broadcasts = {("6/30", "02:00"): ["フジテレビ", "NHK BS", "DAZN"]}
+    merged = merge_matches(schedule, broadcasts)
+    assert len(merged) == 1
+    m = merged[0]
+    assert m["tv_onair"] == ["フジテレビ"]
+    assert m["tv_bs"] == ["NHK BS"]
+    assert m["tv_net"] == ["DAZN"]
+    assert m["is_japan"] is True
+    assert m["score"] == {"home": 2, "away": 1}
+
+
+def test_merge_matches_without_broadcast_has_empty_lists():
+    schedule = [{"date": "9/24", "time": "19:35", "stage": "S",
+                 "team1": "日本", "team2": "パラグアイ"}]
+    merged = merge_matches(schedule, {})
+    m = merged[0]
+    assert m["tv_onair"] == [] and m["tv_bs"] == [] and m["tv_net"] == []
+    assert m["score"] is None

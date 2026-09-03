@@ -8,6 +8,7 @@ Goal.com から日本代表の試合日程・放送予定を取得して matches
 import json
 import os
 import re
+from bs4 import BeautifulSoup
 
 URL = "https://www.goal.com/jp/ニュース/japan-national-team-schedule-broadcast/1oyzx47bv2f6p1lcdsrtkc89s8"
 OUTPUT_FILE = os.path.join(os.path.dirname(__file__), "matches.json")
@@ -83,6 +84,10 @@ def parse_schedule_card(text: str):
     if m:
         return {"team1": m.group(1).strip(), "team2": m.group(2).strip()}
 
+    m = re.match(r"^(.+?)\s*-\s*(.+?)$", text)
+    if m:
+        return {"team1": m.group(1).strip(), "team2": m.group(2).strip()}
+
     return None
 
 
@@ -102,6 +107,71 @@ def parse_broadcast_text(text: str) -> list:
             if name and name not in broadcasters:
                 broadcasters.append(name)
     return broadcasters
+
+
+def parse_schedule_table(soup) -> list:
+    table = soup.find_all("table")[0]
+    rows = table.find_all("tr")
+    results = []
+    for row in rows[1:]:
+        cells = [c.get_text(" ", strip=True) for c in row.find_all(["td", "th"])]
+        if len(cells) < 4:
+            continue
+        date_time = parse_date_time(cells[0])
+        if date_time is None:
+            continue
+        card = parse_schedule_card(cells[2])
+        if card is None:
+            continue
+        date, time_str = date_time
+        entry = {"date": date, "time": time_str, "stage": cells[1], **card}
+        results.append(entry)
+    return results
+
+
+def parse_broadcast_table(soup) -> dict:
+    tables = soup.find_all("table")
+    if len(tables) == 0:
+        return {}
+    # Use the second table if it exists (schedule + broadcast on same page),
+    # otherwise use the first table (broadcast-only page)
+    table = tables[1] if len(tables) >= 2 else tables[0]
+    rows = table.find_all("tr")
+    result = {}
+    for row in rows[1:]:
+        cells = [c.get_text(" ", strip=True) for c in row.find_all(["td", "th"])]
+        if len(cells) < 3:
+            continue
+        date_time = parse_date_time(cells[0])
+        if date_time is None:
+            continue
+        result[date_time] = parse_broadcast_text(cells[2])
+    return result
+
+
+def merge_matches(schedule: list, broadcasts: dict) -> list:
+    matches = []
+    for entry in schedule:
+        key = (entry["date"], entry["time"])
+        broadcasters = broadcasts.get(key, [])
+        tv_onair = [b for b in broadcasters if classify_broadcaster(b) == "onair"]
+        tv_bs = [b for b in broadcasters if classify_broadcaster(b) == "bs"]
+        tv_net = [b for b in broadcasters if classify_broadcaster(b) == "net"]
+
+        team1, team2 = entry["team1"], entry["team2"]
+        is_japan = any(name in team1 or name in team2 for name in JAPAN_NAMES)
+
+        score = None
+        if "score1" in entry:
+            score = {"home": entry["score1"], "away": entry["score2"]}
+
+        matches.append({
+            "date": entry["date"], "time": entry["time"], "stage": entry["stage"],
+            "team1": team1, "team2": team2,
+            "tv_onair": tv_onair, "tv_bs": tv_bs, "tv_net": tv_net,
+            "is_japan": is_japan, "score": score,
+        })
+    return matches
 
 
 if __name__ == "__main__":
