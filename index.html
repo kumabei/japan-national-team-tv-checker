@@ -1,0 +1,915 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="代表放送">
+<link rel="apple-touch-icon" href="icon.png">
+<link rel="icon" href="icon.png">
+<meta name="theme-color" content="#0B1A33">
+<title>サッカー日本代表 TV放送チェッカー</title>
+<style>
+:root{
+  --bg:#0B1A33;
+  --surface:#12274A;
+  --surface-2:#1A3560;
+  --border:#254A82;
+  --text:#F2F1EC;
+  --muted:#8FA3C9;
+  --accent:#00A0E9;
+  --accent-dim:#0D3A5C;
+  --onair:#3DDC84;
+  --onair-dim:#173A29;
+  --bs:#5FA8E0;
+  --bs-dim:#16263A;
+  --gray-dim:#1A2E52;
+  --jp:#E0344C;
+  --rerun:#B48AFF;
+  --rerun-dim:#2A1F44;
+}
+
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{
+  background:var(--bg);
+  color:var(--text);
+  font-family:-apple-system,'Hiragino Sans','Hiragino Kaku Gothic ProN',sans-serif;
+  -webkit-font-smoothing:antialiased;
+  padding-bottom:48px;
+}
+.mono{font-family:ui-monospace,'SF Mono',Menlo,monospace;}
+.display{font-family:-apple-system,'Hiragino Sans',sans-serif;font-stretch:condensed;}
+
+/* ---------- Header ---------- */
+header{
+  position:sticky;top:0;z-index:30;
+  background:rgba(17,20,28,0.92);
+  backdrop-filter:blur(10px);
+  border-bottom:1px solid var(--border);
+  padding:14px 16px 0 16px;
+  padding-top:max(14px,env(safe-area-inset-top));
+}
+.title-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
+.title-row h1{
+  font-family:-apple-system,'Hiragino Sans',sans-serif;
+  font-stretch:condensed;
+  font-size:19px;font-weight:600;letter-spacing:0.02em;margin:0;text-transform:uppercase;
+}
+.title-row h1 span{color:var(--accent);}
+.clock{font-family:ui-monospace,'SF Mono',Menlo,monospace;font-size:12px;color:var(--muted);}
+
+.filters{
+  display:flex;gap:6px;overflow-x:auto;
+  padding-bottom:12px;
+  -ms-overflow-style:none;scrollbar-width:none;
+}
+.filters::-webkit-scrollbar{display:none;}
+.chip{
+  flex:0 0 auto;
+  font-family:-apple-system,'Hiragino Sans','Hiragino Kaku Gothic ProN',sans-serif;
+  font-size:13px;font-weight:500;
+  color:var(--muted);
+  background:var(--surface);
+  border:1px solid var(--border);
+  padding:7px 14px;border-radius:999px;white-space:nowrap;cursor:pointer;
+  transition:all .15s ease;
+}
+.chip.active{
+  background:var(--accent);color:#1A1306;border-color:var(--accent);font-weight:700;
+}
+
+/* ---------- Legend ---------- */
+.legend{
+  display:flex;gap:14px;flex-wrap:wrap;
+  font-size:11px;color:var(--muted);
+  padding:10px 16px;border-bottom:1px solid var(--border);
+}
+.legend i{
+  display:inline-block;width:8px;height:8px;border-radius:50%;
+  margin-right:5px;vertical-align:middle;
+}
+
+/* ---------- List ---------- */
+main{max-width:560px;margin:0 auto;padding:0 0 24px;}
+.date-head{
+  position:sticky;top:96px;z-index:20;
+  background:rgba(17,20,28,0.96);
+  backdrop-filter:blur(8px);
+  padding:10px 16px 6px;
+  display:flex;align-items:center;gap:8px;
+  border-bottom:1px solid var(--border);
+  cursor:pointer;
+}
+.date-head:hover .d{color:var(--accent);}
+.date-head .d{
+  font-family:-apple-system,'Hiragino Sans',sans-serif;font-stretch:condensed;
+  font-size:15px;font-weight:600;letter-spacing:0.03em;
+}
+.today-tag{
+  font-size:10px;font-weight:700;color:#1A1306;
+  background:var(--accent);padding:2px 7px;border-radius:5px;letter-spacing:0.05em;
+}
+
+.match{
+  display:flex;align-items:stretch;gap:12px;
+  padding:12px 16px;border-bottom:1px solid var(--border);position:relative;
+}
+.match.jp{background:linear-gradient(90deg,rgba(224,52,76,0.10),transparent 60%);}
+.match.jp::before{
+  content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--jp);
+}
+.match.hidden{display:none;}
+
+.time-block{
+  flex:0 0 56px;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;
+}
+.time-block .t{font-size:17px;font-weight:700;color:var(--accent);}
+.time-block .stage{font-size:12px;color:var(--muted);margin-top:2px;line-height:1.3;}
+
+.teams-block{flex:1;display:flex;flex-direction:row;align-items:center;gap:4px;min-width:0;}
+.teams-names{display:flex;flex-direction:column;justify-content:center;gap:3px;min-width:0;}
+.team-line{display:flex;align-items:center;gap:7px;font-size:14px;font-weight:500;}
+.scores-col{display:flex;flex-direction:column;align-items:center;gap:3px;min-width:22px;}
+.pk-col{display:flex;flex-direction:column;align-items:center;gap:3px;min-width:30px;font-size:10px;color:var(--muted);font-family:ui-monospace,'SF Mono',Menlo,monospace;}
+.flag-img{
+  width:22px;height:15px;flex:0 0 22px;
+  border-radius:2px;object-fit:cover;background:#000;
+  box-shadow:0 0 0 1px rgba(255,255,255,0.18);
+}
+.vs{font-size:10px;color:var(--muted);margin-left:1px;}
+.jp-tag{font-size:10px;color:var(--jp);font-weight:700;margin-top:2px;}
+
+.status-block{
+  flex:0 0 108px;display:flex;flex-direction:column;align-items:flex-end;justify-content:center;gap:4px;
+}
+.badge{
+  font-size:10.5px;font-weight:700;padding:3px 7px;border-radius:5px;
+  display:flex;align-items:center;gap:4px;white-space:nowrap;
+}
+.badge i{display:inline-block;width:6px;height:6px;border-radius:50%;}
+.badge.onair{background:var(--onair-dim);color:var(--onair);}
+.badge.onair i{background:var(--onair);}
+.badge.bs{background:var(--bs-dim);color:var(--bs);}
+.badge.bs i{background:var(--bs);}
+.badge.net{background:var(--accent-dim);color:var(--accent);}
+.badge.net i{background:var(--accent);}
+.badge.gray{background:var(--gray-dim);color:var(--muted);}
+.badge.gray i{background:var(--muted);}
+.badge.rerun{background:var(--rerun-dim);color:var(--rerun);}
+.badge.rerun i{background:var(--rerun);}
+.net-tag{font-size:9.5px;color:var(--accent);font-weight:700;}
+
+.score{
+  font-size:15px;font-weight:700;
+  color:var(--accent);
+  font-family:ui-monospace,'SF Mono',Menlo,monospace;
+  line-height:1.4;
+  flex-shrink:0;
+}
+
+.live-circle{
+  display:inline-flex;align-items:center;justify-content:center;
+  padding:3px 10px;height:22px;border-radius:999px;
+  background:var(--onair-dim);color:var(--onair);
+  font-size:10px;font-weight:800;
+  border:2px solid var(--onair);
+  margin-top:4px;
+  animation:livepulse 1.5s ease-in-out infinite;
+}
+@keyframes livepulse{
+  0%,100%{box-shadow:0 0 0 0 rgba(61,220,132,0.5);}
+  50%{box-shadow:0 0 0 6px rgba(61,220,132,0);}
+}
+
+footer{
+  max-width:560px;margin:24px auto 0;padding:0 18px;
+  font-size:11px;color:var(--muted);line-height:1.7;
+}
+footer a{color:var(--bs);}
+
+.section-empty{
+  text-align:center;color:var(--muted);padding:40px 20px;font-size:13px;
+}
+
+.scrolltop{
+  position:fixed;right:16px;bottom:20px;z-index:25;
+  background:var(--accent);color:#1A1306;border:none;
+  width:42px;height:42px;border-radius:50%;
+  display:none;align-items:center;justify-content:center;
+  font-size:16px;font-weight:700;cursor:pointer;
+  box-shadow:0 4px 14px rgba(0,0,0,0.4);
+}
+
+.day-nav{
+  position:sticky;top:96px;z-index:21;
+  display:flex;align-items:center;justify-content:center;gap:14px;
+  padding:12px 16px;
+  background:rgba(17,20,28,0.96);
+  backdrop-filter:blur(8px);
+  border-bottom:1px solid var(--border);
+}
+.day-nav.hidden{display:none;}
+.nav-arrow{
+  background:var(--surface);border:1px solid var(--border);color:var(--text);
+  width:36px;height:36px;border-radius:50%;font-size:14px;flex:0 0 36px;cursor:pointer;
+}
+.nav-arrow:disabled{opacity:.25;}
+.day-label{font-size:17px;font-weight:600;min-width:130px;text-align:center;}
+.today-btn{
+  font-size:11.5px;font-weight:700;color:var(--accent);background:none;
+  border:1px solid var(--accent-dim);border-radius:999px;padding:6px 12px;cursor:pointer;
+}
+
+.japan-countdown{
+  background:linear-gradient(135deg,rgba(224,52,76,0.15),rgba(0,63,138,0.15));
+  border:1px solid rgba(224,52,76,0.3);
+  border-radius:10px;padding:12px 16px;
+  max-width:560px;margin:10px auto;
+  display:flex;align-items:center;justify-content:space-between;
+}
+.japan-countdown.hidden{display:none;}
+.jc-label{font-size:11px;color:var(--muted);margin-bottom:3px;}
+.jc-match{font-size:13px;font-weight:600;color:var(--text);}
+.jc-time{font-family:ui-monospace,'SF Mono',Menlo,monospace;font-size:22px;font-weight:700;color:var(--jp);letter-spacing:0.04em;}
+
+.theme-btn{
+  background:none;border:1px solid var(--border);
+  color:var(--muted);font-size:16px;
+  width:32px;height:32px;border-radius:50%;cursor:pointer;flex:0 0 32px;
+  display:flex;align-items:center;justify-content:center;
+}
+
+/* ライトテーマ */
+body.light{
+  --bg:#F0F4FF;--surface:#FFFFFF;--surface-2:#E8EDF8;--border:#C8D0E8;
+  --text:#0D1B6E;--muted:#5566AA;--accent:#003F8A;--accent-dim:#C8D8F0;
+  --onair:#006633;--onair-dim:#D0F0E0;--bs:#003F8A;--bs-dim:#D0E4F8;
+  --gray-dim:#E0E4F0;--jp:#C0002A;--rerun:#7C3AED;--rerun-dim:#EDE9FE;
+}
+body.light header{background:rgba(240,244,255,0.95);}
+body.light .date-head{background:rgba(240,244,255,0.97);}
+body.light .day-nav{background:rgba(240,244,255,0.97);}
+body.light .chip{color:#0D1B6E;background:#FFFFFF;border-color:#C8D0E8;}
+body.light .chip.active{background:#003F8A;color:#FFFFFF;border-color:#003F8A;}
+body.light .today-tag{background:var(--accent);color:#FFFFFF;}
+body.light .date-head .d{color:var(--text);}
+/* ライトモードは濃い青丸・白矢印 */
+body.light .scrolltop{background:var(--accent);color:#FFFFFF;}
+
+/* ローディング/エラー */
+.loading-msg{
+  text-align:center;padding:60px 20px;color:var(--muted);font-size:14px;
+}
+.loading-msg .icon{font-size:32px;margin-bottom:12px;}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="title-row">
+    <h1>日本代表<span>TV</span>放送チェッカー</h1>
+    <div style="display:flex;align-items:center;gap:8px;">
+      <div class="clock mono" id="clock">--:--</div>
+      <button class="theme-btn" id="themeBtn" title="ライト／ダーク切替">🌙</button>
+    </div>
+  </div>
+  <div class="filters" id="filters">
+    <div class="chip" data-filter="date">日付</div>
+    <div class="chip" data-filter="onair">地上波あり</div>
+    <div class="chip active" data-filter="all">全試合</div>
+  </div>
+</header>
+
+<div class="day-nav hidden" id="dayNav">
+  <button class="nav-arrow" id="prevDay">◀</button>
+  <div class="day-label display" id="dayLabel"></div>
+  <button class="nav-arrow" id="nextDay">▶</button>
+  <button class="today-btn" id="jumpToday">今日</button>
+</div>
+
+<div class="legend">
+  <span><i style="background:var(--onair)"></i>地上波で生中継</span>
+  <span><i style="background:var(--bs)"></i>BSのみ（録画含む）</span>
+  <span><i style="background:var(--muted)"></i>地上波未定</span>
+  <span><i style="background:var(--rerun)"></i>再放送</span>
+  <span style="color:var(--jp)">●日本代表戦</span>
+</div>
+
+<div class="japan-countdown hidden" id="japanCountdown">
+  <div>
+    <div class="jc-label">🇯🇵 次の日本戦まで</div>
+    <div class="jc-match" id="jcMatch"></div>
+  </div>
+  <div class="jc-time" id="jcTime"></div>
+</div>
+
+<main id="list">
+  <div class="loading-msg">
+    <div class="icon">⚽</div>
+    <div>データを読み込み中...</div>
+  </div>
+</main>
+
+<footer>
+  <p>放送情報は変更される場合があります。最新情報は各放送局の公式サイトをご確認ください。</p>
+  <p>データソース: <a href="https://www.goal.com/jp" target="_blank">Goal.com</a></p>
+</footer>
+
+<button class="scrolltop" id="scrollTop" title="トップへ戻る">▲</button>
+
+<script>
+// ============================================================
+// チーム名 → 国旗コード（flagcdn.com 用）
+// ============================================================
+const TEAM_FLAG = {
+  "メキシコ":"mx","南アフリカ":"za","韓国":"kr","チェコ":"cz",
+  "カナダ":"ca","ボスニア・ヘルツェゴビナ":"ba","アメリカ":"us","パラグアイ":"py",
+  "カタール":"qa","スイス":"ch","ブラジル":"br","モロッコ":"ma",
+  "ハイチ":"ht","スコットランド":"gb-sct","オーストラリア":"au","トルコ":"tr",
+  "ドイツ":"de","キュラソー":"cw","オランダ":"nl","日本":"jp",
+  "コートジボワール":"ci","エクアドル":"ec","スウェーデン":"se","チュニジア":"tn",
+  "スペイン":"es","カーボベルデ":"cv","ベルギー":"be","エジプト":"eg",
+  "サウジアラビア":"sa","ウルグアイ":"uy","イラン":"ir","ニュージーランド":"nz",
+  "フランス":"fr","セネガル":"sn","イラク":"iq","ノルウェー":"no",
+  "アルゼンチン":"ar","アルジェリア":"dz","オーストリア":"at","ヨルダン":"jo",
+  "ポルトガル":"pt","DRコンゴ":"cd","イングランド":"gb-eng","クロアチア":"hr",
+  "ガーナ":"gh","パナマ":"pa","ウズベキスタン":"uz","コロンビア":"co"
+};
+
+// 曜日
+const WEEKDAYS = ["日","月","火","水","木","金","土"];
+
+// ============================================================
+// 大会名カテゴリ判定（matches.json の stage フィールドから簡易マッチング）
+// ============================================================
+const STAGE_CATEGORIES = [
+  { key: "friendly",       label: "親善試合",           test: s => s.includes("親善試合") },
+  { key: "kirin-challenge", label: "キリンチャレンジカップ", test: s => s.includes("キリンチャレンジカップ") },
+  { key: "kirin-cup",      label: "キリンカップ",         test: s => s.includes("キリンカップ") },
+  { key: "asia",           label: "アジア",             test: s => s.includes("アジア") },
+  { key: "worldcup",       label: "ワールドカップ",       test: s => s.includes("ワールドカップ") },
+];
+function getCategoryKey(stage) {
+  const found = STAGE_CATEGORIES.find(c => c.test(stage || ""));
+  return found ? found.key : "other";
+}
+function getCategoryLabel(key) {
+  const found = STAGE_CATEGORIES.find(c => c.key === key);
+  return found ? found.label : "その他";
+}
+
+// ============================================================
+// インラインデータ（ローカルで直接開いた場合のCORS回避用）
+// Netlify などサーバー環境では fetch が成功するためこちらは使われない
+// scraper.py を実行して matches.json を更新した際は、
+// このデータも同様に更新することで完全オフライン動作が可能
+// ============================================================
+const INLINE_MATCHES = [
+  {"date":"6/12","time":"04:00","stage":"A組1節","team1":"メキシコ","team2":"南アフリカ","tv_onair":["NHK"],"tv_bs":[],"tv_net":[],"tv_bsp4k":true,"bsp4k_live":false,"is_live_broadcast":true,"score":{"home": 2, "away": 0},"is_japan":false},
+  {"date":"6/12","time":"11:00","stage":"A組1節","team1":"韓国","team2":"チェコ","tv_onair":[],"tv_bs":[],"tv_net":[],"tv_bsp4k":true,"bsp4k_live":false,"is_live_broadcast":false,"score":{"home": 2, "away": 1},"is_japan":false},
+  {"date":"6/13","time":"04:00","stage":"B組1節","team1":"カナダ","team2":"ボスニア・ヘルツェゴビナ","tv_onair":["NHK"],"tv_bs":[],"tv_net":[],"tv_bsp4k":true,"bsp4k_live":false,"is_live_broadcast":true,"score":{"home": 1, "away": 1},"is_japan":false},
+  {"date":"6/13","time":"10:00","stage":"D組1節","team1":"アメリカ","team2":"パラグアイ","tv_onair":[],"tv_bs":[],"tv_net":[],"tv_bsp4k":true,"bsp4k_live":false,"is_live_broadcast":false,"score":{"home": 4, "away": 1},"is_japan":false},
+  {"date":"6/14","time":"04:00","stage":"B組1節","team1":"カタール","team2":"スイス","tv_onair":[],"tv_bs":[],"tv_net":[],"tv_bsp4k":true,"bsp4k_live":false,"is_live_broadcast":false,"score":{"home": 1, "away": 1},"is_japan":false},
+  {"date":"6/14","time":"07:00","stage":"C組1節","team1":"ブラジル","team2":"モロッコ","tv_onair":[],"tv_bs":[],"tv_net":[],"tv_bsp4k":true,"bsp4k_live":false,"is_live_broadcast":false,"score":{"home": 1, "away": 1},"is_japan":false},
+  {"date":"6/14","time":"10:00","stage":"C組1節","team1":"ハイチ","team2":"スコットランド","tv_onair":["NHK"],"tv_bs":[],"tv_net":[],"tv_bsp4k":true,"bsp4k_live":false,"is_live_broadcast":true,"score":{"home": 0, "away": 1},"is_japan":false},
+  {"date":"6/14","time":"13:00","stage":"D組1節","team1":"オーストラリア","team2":"トルコ","tv_onair":["日テレ"],"tv_bs":[],"tv_net":[],"tv_bsp4k":true,"bsp4k_live":false,"is_live_broadcast":true,"score":{"home": 2, "away": 0},"is_japan":false},
+  {"date":"6/15","time":"02:00","stage":"E組1節","team1":"ドイツ","team2":"キュラソー","tv_onair":[],"tv_bs":[],"tv_net":[],"tv_bsp4k":true,"bsp4k_live":false,"is_live_broadcast":false,"score":{"home": 7, "away": 1},"is_japan":false},
+  {"date":"6/15","time":"05:00","stage":"F組1節","team1":"オランダ","team2":"日本","tv_onair":["NHK"],"tv_bs":[],"tv_net":[],"tv_bsp4k":true,"bsp4k_live":false,"is_live_broadcast":true,"score":{"home": 2, "away": 2},"is_japan":true},
+  {"date":"6/15","time":"08:00","stage":"E組1節","team1":"コートジボワール","team2":"エクアドル","tv_onair":[],"tv_bs":[],"tv_net":[],"tv_bsp4k":true,"bsp4k_live":false,"is_live_broadcast":false,"score":{"home": 1, "away": 0},"is_japan":false},
+  {"date":"6/15","time":"11:00","stage":"F組1節","team1":"スウェーデン","team2":"チュニジア","tv_onair":["日テレ"],"tv_bs":[],"tv_net":[],"tv_bsp4k":true,"bsp4k_live":false,"is_live_broadcast":true,"score":{"home": 5, "away": 1},"is_japan":false},
+  {"date":"6/16","time":"01:00","stage":"H組1節","team1":"スペイン","team2":"カーボベルデ","tv_onair":["NHK"],"tv_bs":[],"tv_net":[],"tv_bsp4k":true,"bsp4k_live":false,"is_live_broadcast":true,"score":{"home": 0, "away": 0},"is_japan":false},
+  {"date":"6/16","time":"04:00","stage":"G組1節","team1":"ベルギー","team2":"エジプト","tv_onair":["NHK"],"tv_bs":[],"tv_net":[],"tv_bsp4k":true,"bsp4k_live":false,"is_live_broadcast":true,"score":{"home": 1, "away": 1},"is_japan":false},
+  {"date":"6/16","time":"07:00","stage":"H組1節","team1":"サウジアラビア","team2":"ウルグアイ","tv_onair":[],"tv_bs":[],"tv_net":[],"tv_bsp4k":true,"bsp4k_live":false,"is_live_broadcast":false,"score":{"home": 1, "away": 1},"is_japan":false},
+  {"date":"6/16","time":"10:00","stage":"G組1節","team1":"イラン","team2":"ニュージーランド","tv_onair":[],"tv_bs":[],"tv_net":[],"tv_bsp4k":true,"bsp4k_live":false,"is_live_broadcast":false,"score":{"home": 2, "away": 2},"is_japan":false},
+  {"date":"6/17","time":"04:00","stage":"I組1節","team1":"フランス","team2":"セネガル","tv_onair":["フジテレビ"],"tv_bs":[],"tv_net":[],"tv_bsp4k":true,"bsp4k_live":false,"is_live_broadcast":true,"score":{"home": 3, "away": 1},"is_japan":false},
+  {"date":"6/17","time":"07:00","stage":"I組1節","team1":"イラク","team2":"ノルウェー","tv_onair":[],"tv_bs":[],"tv_net":[],"tv_bsp4k":true,"bsp4k_live":false,"is_live_broadcast":false,"score":{"home": 1, "away": 4},"is_japan":false},
+  {"date":"6/17","time":"10:00","stage":"J組1節","team1":"アルゼンチン","team2":"アルジェリア","tv_onair":["NHK"],"tv_bs":[],"tv_net":[],"tv_bsp4k":true,"bsp4k_live":false,"is_live_broadcast":true,"score":{"home": 3, "away": 0},"is_japan":false},
+  {"date":"6/17","time":"13:00","stage":"J組1節","team1":"オーストリア","team2":"ヨルダン","tv_onair":[],"tv_bs":[],"tv_net":[],"tv_bsp4k":true,"bsp4k_live":false,"is_live_broadcast":false,"score":{"home": 3, "away": 1},"is_japan":false},
+  {"date":"6/18","time":"02:00","stage":"K組1節","team1":"ポルトガル","team2":"DRコンゴ","tv_onair":["フジテレビ"],"tv_bs":[],"tv_net":[],"tv_bsp4k":true,"bsp4k_live":false,"is_live_broadcast":true,"score":{"home": 1, "away": 1},"is_japan":false},
+  {"date":"6/18","time":"05:00","stage":"L組1節","team1":"イングランド","team2":"クロアチア","tv_onair":[],"tv_bs":[],"tv_net":[],"tv_bsp4k":true,"bsp4k_live":false,"is_live_broadcast":false,"score":{"home": 4, "away": 2},"is_japan":false},
+  {"date":"6/18","time":"08:00","stage":"L組1節","team1":"ガーナ","team2":"パナマ","tv_onair":[],"tv_bs":[],"tv_net":[],"tv_bsp4k":true,"bsp4k_live":false,"is_live_broadcast":false,"score":{"home": 1, "away": 0},"is_japan":false},
+  {"date":"6/18","time":"11:00","stage":"K組1節","team1":"ウズベキスタン","team2":"コロンビア","tv_onair":[],"tv_bs":[],"tv_net":[],"tv_bsp4k":true,"bsp4k_live":false,"is_live_broadcast":false,"score":{"home": 1, "away": 3},"is_japan":false},
+  {"date":"6/19","time":"01:00","stage":"A組2節","team1":"チェコ","team2":"南アフリカ","tv_onair":["日テレ"],"tv_bs":[],"tv_net":[],"tv_bsp4k":true,"bsp4k_live":false,"is_live_broadcast":true,"score":{"home": 1, "away": 1},"is_japan":false},
+  {"date":"6/19","time":"04:00","stage":"B組2節","team1":"スイス","team2":"ボスニア・ヘルツェゴビナ","tv_onair":[],"tv_bs":[],"tv_net":[],"tv_bsp4k":true,"bsp4k_live":false,"is_live_broadcast":false,"score":{"home": 4, "away": 1},"is_japan":false},
+  {"date":"6/19","time":"07:00","stage":"B組2節","team1":"カナダ","team2":"カタール","tv_onair":[],"tv_bs":[],"tv_net":[],"tv_bsp4k":true,"bsp4k_live":false,"is_live_broadcast":false,"score":{"home": 6, "away": 0},"is_japan":false},
+  {"date":"6/19","time":"10:00","stage":"A組2節","team1":"メキシコ","team2":"韓国","tv_onair":["NHK"],"tv_bs":[],"tv_net":[],"tv_bsp4k":true,"bsp4k_live":false,"is_live_broadcast":true,"score":{"home": 1, "away": 0},"is_japan":false},
+  {"date":"6/20","time":"04:00","stage":"D組2節","team1":"アメリカ","team2":"オーストラリア","tv_onair":["NHK"],"tv_bs":[],"tv_net":[],"tv_bsp4k":true,"bsp4k_live":false,"is_live_broadcast":true,"score":{"home": 2, "away": 0},"is_japan":false},
+  {"date":"6/20","time":"07:00","stage":"C組2節","team1":"スコットランド","team2":"モロッコ","tv_onair":["フジテレビ"],"tv_bs":[],"tv_net":[],"tv_bsp4k":true,"bsp4k_live":false,"is_live_broadcast":true,"score":{"home": 0, "away": 1},"is_japan":false},
+  {"date":"6/20","time":"09:30","stage":"C組2節","team1":"ブラジル","team2":"ハイチ","tv_onair":["NHK"],"tv_bs":[],"tv_net":[],"tv_bsp4k":true,"bsp4k_live":false,"is_live_broadcast":true,"score":{"home": 3, "away": 0},"is_japan":false},
+  {"date":"6/20","time":"12:00","stage":"D組2節","team1":"トルコ","team2":"パラグアイ","tv_onair":[],"tv_bs":[],"tv_net":[],"tv_bsp4k":true,"bsp4k_live":false,"is_live_broadcast":false,"score":{"home": 0, "away": 1},"is_japan":false},
+  {"date":"6/21","time":"02:00","stage":"F組2節","team1":"オランダ","team2":"スウェーデン","tv_onair":["NHK"],"tv_bs":[],"tv_net":[],"tv_bsp4k":true,"bsp4k_live":false,"is_live_broadcast":true,"score":{"home": 5, "away": 1},"is_japan":false},
+  {"date":"6/21","time":"05:00","stage":"E組2節","team1":"ドイツ","team2":"コートジボワール","tv_onair":["日テレ"],"tv_bs":[],"tv_net":[],"tv_bsp4k":true,"bsp4k_live":false,"is_live_broadcast":true,"score":{"home": 2, "away": 1},"is_japan":false},
+  {"date":"6/21","time":"09:00","stage":"E組2節","team1":"エクアドル","team2":"キュラソー","tv_onair":[],"tv_bs":[],"tv_net":[],"tv_bsp4k":true,"bsp4k_live":false,"is_live_broadcast":false,"score":{"home": 0, "away": 0},"is_japan":false},
+  {"date":"6/21","time":"13:00","stage":"F組2節","team1":"チュニジア","team2":"日本","tv_onair":["日テレ"],"tv_bs":[],"tv_net":[],"tv_bsp4k":true,"bsp4k_live":false,"is_live_broadcast":true,"score":{"home": 0, "away": 4},"is_japan":true},
+  {"date":"6/22","time":"01:00","stage":"H組2節","team1":"スペイン","team2":"サウジアラビア","tv_onair":["NHK"],"tv_bs":[],"tv_net":[],"tv_bsp4k":true,"bsp4k_live":false,"is_live_broadcast":true,"score":{"home": 4, "away": 0},"is_japan":false},
+  {"date":"6/22","time":"04:00","stage":"G組2節","team1":"ベルギー","team2":"イラン","tv_onair":[],"tv_bs":[],"tv_net":[],"tv_bsp4k":true,"bsp4k_live":false,"is_live_broadcast":false,"score":{"home": 0, "away": 0},"is_japan":false},
+  {"date":"6/22","time":"07:00","stage":"H組2節","team1":"ウルグアイ","team2":"カーボベルデ","tv_onair":[],"tv_bs":[],"tv_net":[],"tv_bsp4k":true,"bsp4k_live":false,"is_live_broadcast":false,"score":{"home": 2, "away": 2},"is_japan":false},
+  {"date":"6/22","time":"10:00","stage":"G組2節","team1":"ニュージーランド","team2":"エジプト","tv_onair":[],"tv_bs":[],"tv_net":[],"tv_bsp4k":true,"bsp4k_live":false,"is_live_broadcast":false,"score":{"home": 1, "away": 3},"is_japan":false},
+  {"date":"6/23","time":"02:00","stage":"J組2節","team1":"アルゼンチン","team2":"オーストリア","tv_onair":[],"tv_bs":[],"tv_net":[],"tv_bsp4k":true,"bsp4k_live":false,"is_live_broadcast":false,"score":{"home": 2, "away": 0},"is_japan":false},
+  {"date":"6/23","time":"06:00","stage":"I組2節","team1":"フランス","team2":"イラク","tv_onair":[],"tv_bs":[],"tv_net":[],"tv_bsp4k":true,"bsp4k_live":false,"is_live_broadcast":false,"score":{"home": 3, "away": 0},"is_japan":false},
+  {"date":"6/23","time":"09:00","stage":"I組2節","team1":"ノルウェー","team2":"セネガル","tv_onair":["NHK"],"tv_bs":[],"tv_net":[],"tv_bsp4k":true,"bsp4k_live":false,"is_live_broadcast":true,"score":{"home": 3, "away": 2},"is_japan":false},
+  {"date":"6/23","time":"12:00","stage":"J組2節","team1":"ヨルダン","team2":"アルジェリア","tv_onair":[],"tv_bs":[],"tv_net":[],"tv_bsp4k":true,"bsp4k_live":false,"is_live_broadcast":false,"score":{"home": 1, "away": 2},"is_japan":false},
+  {"date":"6/24","time":"02:00","stage":"K組2節","team1":"ポルトガル","team2":"ウズベキスタン","tv_onair":["NHK"],"tv_bs":[],"tv_net":[],"tv_bsp4k":true,"bsp4k_live":false,"is_live_broadcast":true,"score":{"home": 5, "away": 0},"is_japan":false},
+  {"date":"6/24","time":"05:00","stage":"L組2節","team1":"イングランド","team2":"ガーナ","tv_onair":[],"tv_bs":[],"tv_net":[],"tv_bsp4k":true,"bsp4k_live":false,"is_live_broadcast":false,"score":{"home": 0, "away": 0},"is_japan":false},
+  {"date":"6/24","time":"08:00","stage":"L組2節","team1":"パナマ","team2":"クロアチア","tv_onair":["フジテレビ"],"tv_bs":[],"tv_net":[],"tv_bsp4k":true,"bsp4k_live":false,"is_live_broadcast":true,"score":{"home": 0, "away": 1},"is_japan":false},
+  {"date":"6/24","time":"11:00","stage":"K組2節","team1":"コロンビア","team2":"DRコンゴ","tv_onair":["日テレ"],"tv_bs":[],"tv_net":[],"tv_bsp4k":true,"bsp4k_live":false,"is_live_broadcast":true,"score":{"home": 1, "away": 0},"is_japan":false},
+  {"date":"6/25","time":"04:00","stage":"B組3節","team1":"スイス","team2":"カナダ","tv_onair":["NHK"],"tv_bs":[],"tv_net":[],"tv_bsp4k":true,"bsp4k_live":false,"is_live_broadcast":true,"score":{"home": 1, "away": 3},"is_japan":false},
+  {"date":"6/25","time":"04:00","stage":"B組3節","team1":"ボスニア・ヘルツェゴビナ","team2":"カタール","tv_onair":[],"tv_bs":[],"tv_net":[],"tv_bsp4k":true,"bsp4k_live":false,"is_live_broadcast":false,"score":{"home": 3, "away": 1},"is_japan":false},
+  {"date":"6/25","time":"07:00","stage":"C組3節","team1":"スコットランド","team2":"ブラジル","tv_onair":[],"tv_bs":[],"tv_net":[],"tv_bsp4k":true,"bsp4k_live":false,"is_live_broadcast":false,"score":{"home": 2, "away": 4},"is_japan":false},
+  {"date":"6/25","time":"07:00","stage":"C組3節","team1":"モロッコ","team2":"ハイチ","tv_onair":[],"tv_bs":[],"tv_net":[],"tv_bsp4k":true,"bsp4k_live":false,"is_live_broadcast":false,"score":{"home": 4, "away": 2},"is_japan":false},
+  {"date":"6/25","time":"10:00","stage":"A組3節","team1":"チェコ","team2":"メキシコ","tv_onair":["NHK"],"tv_bs":[],"tv_net":[],"tv_bsp4k":true,"bsp4k_live":false,"is_live_broadcast":true,"score":{"home": 0, "away": 3},"is_japan":false},
+  {"date":"6/25","time":"10:00","stage":"A組3節","team1":"南アフリカ","team2":"韓国","tv_onair":[],"tv_bs":[],"tv_net":[],"tv_bsp4k":true,"bsp4k_live":false,"is_live_broadcast":false,"score":{"home": 3, "away": 0},"is_japan":false},
+  {"date":"6/26","time":"05:00","stage":"E組3節","team1":"キュラソー","team2":"コートジボワール","tv_onair":[],"tv_bs":[],"tv_net":[],"tv_bsp4k":true,"bsp4k_live":false,"is_live_broadcast":false,"score":{"home": 1, "away": 2},"is_japan":false},
+  {"date":"6/26","time":"05:00","stage":"E組3節","team1":"エクアドル","team2":"ドイツ","tv_onair":[],"tv_bs":[],"tv_net":[],"tv_bsp4k":true,"bsp4k_live":false,"is_live_broadcast":false,"score":{"home": 2, "away": 1},"is_japan":false},
+  {"date":"6/26","time":"08:00","stage":"F組3節","team1":"日本","team2":"スウェーデン","tv_onair":["NHK"],"tv_bs":[],"tv_net":[],"tv_bsp4k":true,"bsp4k_live":false,"is_live_broadcast":true,"score":{"home": 3, "away": 1},"is_japan":true},
+  {"date":"6/26","time":"08:00","stage":"F組3節","team1":"チュニジア","team2":"オランダ","tv_onair":[],"tv_bs":[],"tv_net":[],"tv_bsp4k":true,"bsp4k_live":false,"is_live_broadcast":false,"score":{"home": 1, "away": 3},"is_japan":false},
+  {"date":"6/26","time":"11:00","stage":"D組3節","team1":"トルコ","team2":"アメリカ","tv_onair":["日テレ"],"tv_bs":[],"tv_net":[],"tv_bsp4k":true,"bsp4k_live":false,"is_live_broadcast":true,"score":{"home": 0, "away": 0},"is_japan":false},
+  {"date":"6/26","time":"11:00","stage":"D組3節","team1":"パラグアイ","team2":"オーストラリア","tv_onair":[],"tv_bs":[],"tv_net":[],"tv_bsp4k":true,"bsp4k_live":false,"is_live_broadcast":false,"score":{"home": 0, "away": 0},"is_japan":false},
+  {"date":"6/27","time":"04:00","stage":"I組3節","team1":"ノルウェー","team2":"フランス","tv_onair":["NHK"],"tv_bs":[],"tv_net":[],"tv_bsp4k":true,"bsp4k_live":false,"is_live_broadcast":true,"score":{"home": 0, "away": 5},"is_japan":false},
+  {"date":"6/27","time":"04:00","stage":"I組3節","team1":"セネガル","team2":"イラク","tv_onair":[],"tv_bs":[],"tv_net":[],"tv_bsp4k":true,"bsp4k_live":false,"is_live_broadcast":false,"score":{"home": 5, "away": 0},"is_japan":false},
+  {"date":"6/27","time":"09:00","stage":"H組3節","team1":"カーボベルデ","team2":"サウジアラビア","tv_onair":[],"tv_bs":[],"tv_net":[],"tv_bsp4k":true,"bsp4k_live":false,"is_live_broadcast":false,"score":{"home": 1, "away": 0},"is_japan":false},
+  {"date":"6/27","time":"09:00","stage":"H組3節","team1":"ウルグアイ","team2":"スペイン","tv_onair":["日テレ"],"tv_bs":[],"tv_net":[],"tv_bsp4k":true,"bsp4k_live":false,"is_live_broadcast":true,"score":{"home": 0, "away": 1},"is_japan":false},
+  {"date":"6/27","time":"12:00","stage":"G組3節","team1":"エジプト","team2":"イラン","tv_onair":[],"tv_bs":[],"tv_net":[],"tv_bsp4k":true,"bsp4k_live":false,"is_live_broadcast":false,"score":{"home": 5, "away": 1},"is_japan":false},
+  {"date":"6/27","time":"12:00","stage":"G組3節","team1":"ニュージーランド","team2":"ベルギー","tv_onair":["日テレ"],"tv_bs":[],"tv_net":[],"tv_bsp4k":true,"bsp4k_live":false,"is_live_broadcast":true,"score":{"home": 1, "away": 5},"is_japan":false},
+  {"date":"6/28","time":"06:00","stage":"L組3節","team1":"パナマ","team2":"イングランド","tv_onair":[],"tv_bs":[],"tv_net":[],"tv_bsp4k":true,"bsp4k_live":false,"is_live_broadcast":false,"score":{"home": 1, "away": 2},"is_japan":false},
+  {"date":"6/28","time":"06:00","stage":"L組3節","team1":"クロアチア","team2":"ガーナ","tv_onair":[],"tv_bs":[],"tv_net":[],"tv_bsp4k":true,"bsp4k_live":false,"is_live_broadcast":false,"score":{"home": 2, "away": 1},"is_japan":false},
+  {"date":"6/28","time":"08:30","stage":"K組3節","team1":"コロンビア","team2":"ポルトガル","tv_onair":["フジテレビ"],"tv_bs":[],"tv_net":[],"tv_bsp4k":true,"bsp4k_live":false,"is_live_broadcast":true,"score":{"home": 1, "away": 3},"is_japan":false},
+  {"date":"6/28","time":"08:30","stage":"K組3節","team1":"DRコンゴ","team2":"ウズベキスタン","tv_onair":[],"tv_bs":[],"tv_net":[],"tv_bsp4k":true,"bsp4k_live":false,"is_live_broadcast":false,"score":{"home": 3, "away": 1},"is_japan":false},
+  {"date":"6/28","time":"11:00","stage":"J組3節","team1":"アルジェリア","team2":"オーストリア","tv_onair":[],"tv_bs":[],"tv_net":[],"tv_bsp4k":true,"bsp4k_live":false,"is_live_broadcast":false,"score":{"home": 3, "away": 1},"is_japan":false},
+  {"date":"6/28","time":"11:00","stage":"J組3節","team1":"ヨルダン","team2":"アルゼンチン","tv_onair":["NHK"],"tv_bs":[],"tv_net":[],"tv_bsp4k":true,"bsp4k_live":false,"is_live_broadcast":true,"score":{"home": 1, "away": 3},"is_japan":false},
+  {"date":"6/29","time":"04:00","stage":"ラウンド32","team1":"南アフリカ","team2":"カナダ","tv_onair":["NHK"],"tv_bs":[],"tv_net":[],"tv_bsp4k":true,"bsp4k_live":true,"is_live_broadcast":true,"score":{"home": 0, "away": 1},"is_japan":false,"note":"A組2位 vs B組2位"},
+  {"date":"6/30","time":"02:00","stage":"ラウンド32","team1":"日本","team2":"ブラジル","tv_onair":["フジテレビ"],"tv_bs":["NHK BS"],"tv_net":[],"tv_bsp4k":true,"bsp4k_live":false,"is_live_broadcast":true,"score":{"home": 1, "away": 2},"is_japan":true,"note":"C組1位 vs F組2位"},
+  {"date":"6/30","time":"05:30","stage":"ラウンド32","team1":"ドイツ","team2":"パラグアイ","tv_onair":[],"tv_bs":[],"tv_net":[],"tv_bsp4k":true,"bsp4k_live":false,"is_live_broadcast":false,"score":{"home": 1, "away": 1, "pk_home": 3, "pk_away": 4},"is_japan":false,"note":"E組1位 vs 3位通過(ABCDF)"},
+  {"date":"6/30","time":"10:00","stage":"ラウンド32","team1":"オランダ","team2":"モロッコ","tv_onair":["NHK"],"tv_bs":[],"tv_net":[],"tv_bsp4k":true,"bsp4k_live":true,"is_live_broadcast":true,"score":{"home": 1, "away": 1, "pk_home": 2, "pk_away": 3},"is_japan":false,"note":"F組1位 vs C組2位"},
+  {"date":"7/1","time":"02:00","stage":"ラウンド32","team1":"コートジボワール","team2":"ノルウェー","tv_onair":["日テレ"],"tv_bs":[],"tv_net":[],"tv_bsp4k":true,"bsp4k_live":false,"is_live_broadcast":true,"score":{"home": 1, "away": 2},"is_japan":false,"note":"E組2位 vs I組2位"},
+  {"date":"7/1","time":"06:00","stage":"ラウンド32","team1":"フランス","team2":"スウェーデン","tv_onair":["フジテレビ"],"tv_bs":[],"tv_net":[],"tv_bsp4k":true,"bsp4k_live":false,"is_live_broadcast":true,"score":{"home": 3, "away": 0},"is_japan":false,"note":"I組1位 vs 3位通過(CDFGH)"},
+  {"date":"7/1","time":"10:00","stage":"ラウンド32","team1":"メキシコ","team2":"エクアドル","tv_onair":["NHK"],"tv_bs":[],"tv_net":[],"tv_bsp4k":true,"bsp4k_live":true,"is_live_broadcast":true,"score":{"home": 2, "away": 0},"is_japan":false,"note":"A組1位 vs 3位通過(CEFHI)"},
+  {"date":"7/2","time":"01:00","stage":"ラウンド32","team1":"イングランド","team2":"DRコンゴ","tv_onair":["フジテレビ"],"tv_bs":[],"tv_net":[],"tv_bsp4k":true,"bsp4k_live":false,"is_live_broadcast":true,"score":{"home": 2, "away": 1},"is_japan":false,"note":"L組1位 vs 3位通過(EHIJK)"},
+  {"date":"7/2","time":"05:00","stage":"ラウンド32","team1":"ベルギー","team2":"セネガル","tv_onair":["NHK"],"tv_bs":[],"tv_net":[],"tv_bsp4k":true,"bsp4k_live":true,"is_live_broadcast":true,"score":{"home": 3, "away": 2},"is_japan":false,"note":"G組1位 vs 3位通過(AEHIJ)"},
+  {"date":"7/2","time":"09:00","stage":"ラウンド32","team1":"アメリカ","team2":"ボスニア・ヘルツェゴビナ","tv_onair":["NHK"],"tv_bs":[],"tv_net":[],"tv_bsp4k":true,"bsp4k_live":true,"is_live_broadcast":true,"score":{"home": 2, "away": 0},"is_japan":false,"note":"D組1位 vs 3位通過(BEFIJ)"},
+  {"date":"7/3","time":"04:00","stage":"ラウンド32","team1":"スペイン","team2":"オーストリア","tv_onair":["NHK"],"tv_bs":[],"tv_net":[],"tv_bsp4k":true,"bsp4k_live":true,"is_live_broadcast":true,"score":{"home": 3, "away": 0},"is_japan":false,"note":"H組1位 vs J組2位"},
+  {"date":"7/3","time":"08:00","stage":"ラウンド32","team1":"ポルトガル","team2":"クロアチア","tv_onair":["日テレ"],"tv_bs":[],"tv_net":[],"tv_bsp4k":true,"bsp4k_live":false,"is_live_broadcast":true,"score":{"home": 2, "away": 1},"is_japan":false,"note":"K組2位 vs L組2位"},
+  {"date":"7/3","time":"12:00","stage":"ラウンド32","team1":"スイス","team2":"アルジェリア","tv_onair":["NHK Eテレ"],"tv_bs":[],"tv_net":[],"tv_bsp4k":true,"bsp4k_live":true,"is_live_broadcast":true,"score":{"home": 2, "away": 0},"is_japan":false,"note":"NHK総合は13:05〜"},
+  {"date":"7/4","time":"03:00","stage":"ラウンド32","team1":"オーストラリア","team2":"エジプト","tv_onair":["NHK"],"tv_bs":[],"tv_net":[],"tv_bsp4k":true,"bsp4k_live":true,"is_live_broadcast":true,"score":{"home": 1, "away": 1, "pk_home": 2, "pk_away": 4},"is_japan":false,"note":"D組2位 vs G組2位"},
+  {"date":"7/4","time":"07:00","stage":"ラウンド32","team1":"アルゼンチン","team2":"カーボベルデ","tv_onair":["日テレ"],"tv_bs":[],"tv_net":[],"tv_bsp4k":true,"bsp4k_live":false,"is_live_broadcast":true,"score":{"home": 3, "away": 2},"is_japan":false,"note":"J組1位 vs H組2位"},
+  {"date":"7/4","time":"10:30","stage":"ラウンド32","team1":"コロンビア","team2":"ガーナ","tv_onair":[],"tv_bs":[],"tv_net":[],"tv_bsp4k":true,"bsp4k_live":false,"is_live_broadcast":false,"score":{"home": 1, "away": 0},"is_japan":false,"note":"K組1位 vs 3位通過(DEIJL)"},
+  {"date":"7/5","time":"02:00","stage":"ラウンド16","team1":"カナダ","team2":"モロッコ","tv_onair":["NHK"],"tv_bs":[],"tv_net":[],"tv_bsp4k":true,"bsp4k_live":true,"is_live_broadcast":true,"score":{"home": 0, "away": 3},"is_japan":false},
+  {"date":"7/5","time":"06:00","stage":"ラウンド16","team1":"パラグアイ","team2":"フランス","tv_onair":["日テレ"],"tv_bs":[],"tv_net":[],"tv_bsp4k":true,"bsp4k_live":false,"bsp4k_time":"21:00","is_live_broadcast":true,"score":{"home": 0, "away": 1},"is_japan":false},
+  {"date":"7/6","time":"05:00","stage":"ラウンド16","team1":"ブラジル","team2":"ノルウェー","tv_onair":["NHK"],"tv_bs":[],"tv_net":[],"tv_bsp4k":true,"bsp4k_live":true,"is_live_broadcast":true,"score":{"home": 1, "away": 2},"is_japan":false},
+  {"date":"7/6","time":"09:00","stage":"ラウンド16","team1":"メキシコ","team2":"イングランド","tv_onair":[],"tv_bs":[],"tv_net":[],"tv_bsp4k":true,"bsp4k_live":false,"bsp4k_time":"21:00","is_live_broadcast":false,"score":{"home":2,"away":3},"is_japan":false},
+  {"date":"7/7","time":"04:00","stage":"ラウンド16","team1":"ポルトガル","team2":"スペイン","tv_onair":["日テレ"],"tv_bs":[],"tv_net":[],"tv_bsp4k":true,"bsp4k_live":false,"bsp4k_time":"19:00","is_live_broadcast":true,"score":{"home": 0, "away": 1},"is_japan":false},
+  {"date":"7/7","time":"09:00","stage":"ラウンド16","team1":"アメリカ","team2":"ベルギー","tv_onair":["フジテレビ"],"tv_bs":[],"tv_net":[],"tv_bsp4k":true,"bsp4k_live":false,"bsp4k_time":"21:00","is_live_broadcast":true,"score":{"home": 1, "away": 4},"is_japan":false},
+  {"date":"7/8","time":"01:00","stage":"ラウンド16","team1":"アルゼンチン","team2":"エジプト","tv_onair":[],"tv_bs":[],"tv_net":[],"tv_bsp4k":true,"bsp4k_live":true,"is_live_broadcast":true,"score":{"home": 3, "away": 2},"is_japan":false},
+  {"date":"7/8","time":"05:00","stage":"ラウンド16","team1":"スイス","team2":"コロンビア","tv_onair":["NHK"],"tv_bs":[],"tv_net":[],"tv_bsp4k":true,"bsp4k_live":true,"is_live_broadcast":true,"score":{"home": 0, "away": 0, "pk_home": 4, "pk_away": 3},"is_japan":false},
+  {"date":"7/10","time":"05:00","stage":"準々決勝","team1":"フランス","team2":"モロッコ","tv_onair":[],"tv_bs":[],"tv_net":[],"tv_bsp4k":true,"bsp4k_live":false,"bsp4k_time":"21:00","is_live_broadcast":false,"score":{"home": 2, "away": 0},"is_japan":false},
+  {"date":"7/11","time":"04:00","stage":"準々決勝","team1":"スペイン","team2":"ベルギー","tv_onair":["フジテレビ"],"tv_bs":[],"tv_net":[],"tv_bsp4k":true,"bsp4k_live":false,"bsp4k_time":"21:00","is_live_broadcast":true,"score":{"home": 2, "away": 1},"is_japan":false},
+  {"date":"7/12","time":"06:00","stage":"準々決勝","team1":"ノルウェー","team2":"イングランド","tv_onair":["NHK"],"tv_bs":[],"tv_net":[],"tv_bsp4k":true,"bsp4k_live":true,"bsp4k_rerun_time":"21:30","is_live_broadcast":true,"score":{"home": 1, "away": 2},"is_japan":false},
+  {"date":"7/12","time":"10:00","stage":"準々決勝","team1":"アルゼンチン","team2":"スイス","tv_onair":[],"tv_bs":[],"tv_net":[],"tv_bsp4k":true,"bsp4k_live":false,"bsp4k_time":"19:30","is_live_broadcast":false,"score":{"home": 3, "away": 1},"is_japan":false},
+  {"date":"7/15","time":"04:00","stage":"準決勝","team1":"フランス","team2":"スペイン","tv_onair":["日テレ"],"tv_bs":[],"tv_net":[],"tv_bsp4k":true,"bsp4k_live":false,"bsp4k_time":"21:00","is_live_broadcast":true,"score":{"home": 0, "away": 2},"is_japan":false},
+  {"date":"7/16","time":"04:00","stage":"準決勝","team1":"イングランド","team2":"アルゼンチン","tv_onair":["NHK"],"tv_bs":[],"tv_net":[],"tv_bsp4k":true,"bsp4k_live":true,"is_live_broadcast":true,"score":{"home":1,"away":2},"is_japan":false},
+  {"date":"7/19","time":"06:00","stage":"3位決定戦","team1":"フランス","team2":"イングランド","tv_onair":["NHK"],"tv_bs":[],"tv_net":[],"tv_bsp4k":true,"bsp4k_live":true,"is_live_broadcast":true,"score":{"home":4,"away":6},"is_japan":false},
+  {"date":"7/20","time":"04:00","stage":"決勝","team1":"スペイン","team2":"アルゼンチン","tv_onair":["NHK"],"tv_bs":[],"tv_net":[],"tv_bsp4k":true,"bsp4k_live":true,"is_live_broadcast":true,"score":{"home":1,"away":0},"is_japan":false}
+];
+
+// 再放送データ
+
+// 試合データ（fetch後に格納）
+let MATCHES = [];
+let DAYS = []; // [{date, day, matches:[...]}]
+
+// ============================================================
+// 国旗 HTML を生成
+// ============================================================
+function flagHtml(teamName) {
+  const code = TEAM_FLAG[teamName];
+  if (!code) return `<span style="width:22px;height:15px;flex:0 0 22px;display:inline-block;"></span>`;
+  return `<img class="flag-img" src="https://flagcdn.com/${code}.svg" alt="${teamName}" loading="lazy" onerror="this.style.display='none'">`;
+}
+
+// ============================================================
+// 日付文字列から曜日を取得
+// ============================================================
+function getDayLabel(dateStr) {
+  const [m, d] = dateStr.split("/").map(Number);
+  const dt = new Date(2026, m - 1, d);
+  return WEEKDAYS[dt.getDay()];
+}
+
+// ============================================================
+// データを日付でグループ化
+// ============================================================
+function groupByDate(matches) {
+  const map = new Map();
+  for (const m of matches) {
+    if (!map.has(m.date)) {
+      map.set(m.date, { date: m.date, day: getDayLabel(m.date), matches: [] });
+    }
+    map.get(m.date).matches.push(m);
+  }
+  // 日付順にソート
+  return [...map.values()].sort((a, b) => {
+    const [am, ad] = a.date.split("/").map(Number);
+    const [bm, bd] = b.date.split("/").map(Number);
+    return (am * 32 + ad) - (bm * 32 + bd);
+  });
+}
+
+// ============================================================
+// ステータスバッジを生成
+// 各放送局バッジにLIVE/録画/再放送をインライン表示する
+// ============================================================
+function buildStatusBadge(match) {
+  const hasOnair = match.tv_onair && match.tv_onair.length > 0;
+  const hasBs    = match.tv_bs   && match.tv_bs.length   > 0;
+  const hasRec   = match.tv_bsp4k && !match.bsp4k_live;
+  const liveBroadcast = match.is_live_broadcast !== undefined
+    ? match.is_live_broadcast
+    : (hasOnair || hasBs);
+
+  // BSP4K録画バッジ（地上波と並列表示の場合）
+  let recBadge = "";
+  if (hasRec) {
+    if (match.bsp4k_time) {
+      recBadge = `<div class="badge bs" style="margin-top:3px;font-size:9px;"><i></i>BSP4K 録画${match.bsp4k_time}</div>`;
+    } else if (!liveBroadcast) {
+      recBadge = `<div class="badge bs" style="margin-top:3px;font-size:9px;"><i></i>BSP4K 録画${match.time}</div>`;
+    }
+  }
+
+  // BSP4K再放送バッジ
+  const rerunBadge = match.bsp4k_rerun_time
+    ? `<div class="badge rerun" style="margin-top:3px;font-size:9px;"><i></i>BSP4K 再放送 ${match.bsp4k_rerun_time}</div>`
+    : "";
+
+  if (hasOnair) {
+    let html = `<div class="badge onair"><i></i>${match.tv_onair.join("・")} LIVE</div>`;
+    if (hasBs) {
+      html += `<div class="badge bs" style="margin-top:3px;font-size:9px;"><i></i>${match.tv_bs.join("・")} LIVE</div>`;
+    } else if (match.tv_bsp4k && match.bsp4k_live) {
+      html += `<div class="badge bs" style="margin-top:3px;font-size:9px;"><i></i>BSP4K LIVE</div>`;
+    }
+    return html + recBadge + rerunBadge;
+  }
+  if (hasBs) {
+    let html = `<div class="badge bs"><i></i>${match.tv_bs.join("・")} LIVE</div>`;
+    if (match.tv_bsp4k && match.bsp4k_live) {
+      html += `<div class="badge bs" style="margin-top:3px;font-size:9px;"><i></i>BSP4K LIVE</div>`;
+    }
+    return html + recBadge + rerunBadge;
+  }
+  if (match.tv_bsp4k) {
+    if (match.bsp4k_live) {
+      return `<div class="badge bs"><i></i>BSP4K LIVE</div>` + rerunBadge;
+    } else {
+      const t = match.bsp4k_time || match.time;
+      return `<div class="badge bs"><i></i>BSP4K 録画${t}</div>` + rerunBadge;
+    }
+  }
+  if (match.tv_net && match.tv_net.length > 0) {
+    return match.tv_net.map(n => `<div class="badge net"><i></i>${n}</div>`).join("");
+  }
+  return `<div class="badge gray"><i></i>地上波未定</div>`;
+}
+
+// ============================================================
+// 試合リストを描画
+// ============================================================
+function buildList() {
+  const list = document.getElementById("list");
+  if (!DAYS.length) {
+    list.innerHTML = `<div class="section-empty">試合データがありません</div>`;
+    return;
+  }
+
+  // フィルターchipの「全XX試合」を更新
+  const allChip = document.querySelector('.chip[data-filter="all"]');
+  if (allChip) allChip.textContent = `全${MATCHES.length}試合`;
+
+  // 大会名フィルターのchipを動的生成（実データに存在するカテゴリのみ表示）
+  const filtersEl = document.getElementById("filters");
+  filtersEl.querySelectorAll('.chip[data-filter^="cat:"]').forEach(c => c.remove());
+  const presentCategories = STAGE_CATEGORIES.filter(c =>
+    MATCHES.some(m => getCategoryKey(m.stage) === c.key)
+  );
+  if (MATCHES.some(m => getCategoryKey(m.stage) === "other")) {
+    presentCategories.push({ key: "other", label: "その他" });
+  }
+  const onairChip = filtersEl.querySelector('.chip[data-filter="onair"]');
+  presentCategories.forEach(c => {
+    const chip = document.createElement("div");
+    chip.className = "chip";
+    chip.dataset.filter = `cat:${c.key}`;
+    chip.textContent = c.label;
+    filtersEl.insertBefore(chip, onairChip);
+  });
+
+  let html = "";
+  const todayKey = todayDateStr();
+  const TERRESTRIAL = new Set(["NHK","日テレ","フジテレビ","テレビ朝日","TBS"]);
+
+  for (const group of DAYS) {
+    const isToday = group.date === todayKey;
+    html += `<div class="date-head" data-date="${group.date}">
+      <span class="d">${group.date}（${group.day}）</span>
+      ${isToday ? `<span class="today-tag">TODAY</span>` : ""}
+    </div>`;
+
+    for (const m of group.matches) {
+      const hasOnair = m.tv_onair && m.tv_onair.length > 0;
+      const stageText = m.note
+        ? `${m.stage}<br><span style="opacity:.7">${m.note}</span>`
+        : m.stage;
+      const hasScore = m.score && m.score.home !== undefined;
+      const hasPK    = m.score && m.score.pk_home !== undefined;
+      const scoresCol = hasScore
+        ? `<div class="scores-col"><div class="score">${m.score.home}</div><div class="score">${m.score.away}</div></div>`
+        : "";
+      const pkCol = hasPK
+        ? `<div class="pk-col"><div>${m.score.pk_home}PK</div><div>${m.score.pk_away}PK</div></div>`
+        : "";
+
+      html += `<div class="match${m.is_japan ? " jp" : ""}"
+        data-date="${m.date}"
+        data-time="${m.time}"
+        data-jp="${m.is_japan}"
+        data-onair="${hasOnair}"
+        data-category="${getCategoryKey(m.stage)}">
+        <div class="time-block">
+          <div class="t mono">${m.time}</div>
+          <div class="stage">${stageText}</div>
+        </div>
+        <div class="teams-block">
+          <div class="teams-names">
+            <div class="team-line">${flagHtml(m.team1)}<span>${m.team1}</span></div>
+            <div class="team-line"><span class="vs">vs</span>${flagHtml(m.team2)}<span>${m.team2}</span></div>
+            ${m.is_japan ? `<div class="jp-tag">🇯🇵 日本代表戦</div>` : ""}
+          </div>
+          ${scoresCol}${pkCol}
+        </div>
+        <div class="status-block">
+          ${buildStatusBadge(m)}
+        </div>
+      </div>`;
+    }
+
+  }
+
+  list.innerHTML = html;
+
+  // 日付ヘッダークリック → 日付フィルターに切替
+  list.addEventListener("click", function(e) {
+    const head = e.target.closest(".date-head");
+    if (!head) return;
+    const date = head.dataset.date;
+    const idx = DAYS.findIndex(g => g.date === date);
+    if (idx < 0) return;
+    dayIndex = idx;
+    document.querySelectorAll(".chip").forEach(c => c.classList.remove("active"));
+    document.querySelector('.chip[data-filter="date"]').classList.add("active");
+    applyFilter("date");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  });
+}
+
+// ============================================================
+// 日付比較用ヘルパー
+// ============================================================
+function dateVal(str) {
+  const [m, d] = str.split("/").map(Number);
+  return m * 32 + d;
+}
+function todayDateStr() {
+  const now = new Date();
+  return `${now.getMonth() + 1}/${now.getDate()}`;
+}
+function defaultDayIndex() {
+  const tv = dateVal(todayDateStr());
+  let idx = DAYS.findIndex(g => dateVal(g.date) >= tv);
+  return idx === -1 ? Math.max(0, DAYS.length - 1) : idx;
+}
+
+let dayIndex = 0;
+let currentFilter = "all"; // 現在アクティブなフィルター
+
+// ============================================================
+// 日付ナビゲーション描画
+// scrollToTop=true のとき画面トップへスクロール（前後ボタン・今日ボタン用）
+// ============================================================
+function renderDayNav(scrollToTop = false) {
+  if (!DAYS.length) return;
+  const group = DAYS[dayIndex];
+  const tk = todayDateStr();
+  const isToday = group.date === tk;
+  document.getElementById("dayLabel").innerHTML =
+    `${group.date}（${group.day}）${isToday ? `<span class="today-tag" style="margin-left:6px;">TODAY</span>` : ""}`;
+  document.getElementById("prevDay").disabled = dayIndex <= 0;
+  document.getElementById("nextDay").disabled = dayIndex >= DAYS.length - 1;
+
+  document.querySelectorAll(".date-head").forEach(h => h.classList.add("hidden"));
+  document.querySelectorAll(".match").forEach(el => {
+    el.classList.toggle("hidden", el.dataset.date !== group.date);
+  });
+
+  if (scrollToTop) {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+}
+
+// ============================================================
+// フィルター適用
+// ============================================================
+function applyFilter(f) {
+  currentFilter = f;
+  document.getElementById("dayNav").classList.toggle("hidden", f !== "date");
+
+  if (f === "date") {
+    renderDayNav(false); // スクロールは呼び出し元（チップ/ボタン）が制御
+    return;
+  }
+  document.querySelectorAll(".date-head").forEach(h => h.classList.remove("hidden"));
+  document.querySelectorAll(".match").forEach(el => {
+    let show = true;
+    if (f === "onair") show = el.dataset.onair === "true";
+    else if (f.startsWith("cat:")) show = el.dataset.category === f.slice(4);
+    el.classList.toggle("hidden", !show);
+  });
+  document.querySelectorAll(".date-head").forEach(h => {
+    const date = h.dataset.date;
+    const visible = document.querySelectorAll(`.match[data-date="${date}"]:not(.hidden)`).length;
+    h.classList.toggle("hidden", visible === 0);
+  });
+}
+
+// ============================================================
+// 時計更新
+// ============================================================
+function tickClock() {
+  const now = new Date();
+  const hh = String(now.getHours()).padStart(2, "0");
+  const mm = String(now.getMinutes()).padStart(2, "0");
+  document.getElementById("clock").textContent =
+    `${now.getMonth() + 1}/${now.getDate()} ${hh}:${mm}`;
+}
+
+// ============================================================
+// 日本戦カウントダウン
+// ============================================================
+function updateCountdown() {
+  const now = new Date();
+  const el = document.getElementById("japanCountdown");
+
+  const next = MATCHES.find(m => {
+    if (!m.is_japan) return false;
+    const [h, min] = m.time.split(":").map(Number);
+    const [mo, d] = m.date.split("/").map(Number);
+    const t = new Date(2026, mo - 1, d, h, min);
+    return t > now;
+  });
+
+  if (!next) { el.classList.add("hidden"); return; }
+
+  const [h, min] = next.time.split(":").map(Number);
+  const [mo, d] = next.date.split("/").map(Number);
+  const target = new Date(2026, mo - 1, d, h, min);
+  const diff = Math.max(0, target - now);
+
+  const days  = Math.floor(diff / 86400000);
+  const hours = Math.floor((diff % 86400000) / 3600000);
+  const mins  = Math.floor((diff % 3600000) / 60000);
+  const secs  = Math.floor((diff % 60000) / 1000);
+
+  document.getElementById("jcMatch").textContent = `${next.team1} vs ${next.team2}`;
+  document.getElementById("jcTime").textContent = days > 0
+    ? `${days}日 ${String(hours).padStart(2,"0")}:${String(mins).padStart(2,"0")}:${String(secs).padStart(2,"0")}`
+    : `${String(hours).padStart(2,"0")}:${String(mins).padStart(2,"0")}:${String(secs).padStart(2,"0")}`;
+  el.classList.remove("hidden");
+}
+
+// ============================================================
+// スクロールトップボタン（①: 黄色丸、▲、スクロール時表示）
+// ============================================================
+const scrollTopBtn = document.getElementById("scrollTop");
+scrollTopBtn.addEventListener("click", () => {
+  window.scrollTo({ top: 0, behavior: "smooth" });
+});
+window.addEventListener("scroll", () => {
+  scrollTopBtn.style.display = window.scrollY > 300 ? "flex" : "none";
+}, { passive: true });
+
+// ============================================================
+// テーマ切替
+// ============================================================
+(function() {
+  const saved = localStorage.getItem("theme");
+  if (saved === "light") {
+    document.body.classList.add("light");
+  }
+})();
+
+document.getElementById("themeBtn").addEventListener("click", function() {
+  const isLight = document.body.classList.toggle("light");
+  this.textContent = isLight ? "☀️" : "🌙";
+  localStorage.setItem("theme", isLight ? "light" : "dark");
+  if (document.body.classList.contains("light")) {
+    this.textContent = "☀️";
+  } else {
+    this.textContent = "🌙";
+  }
+});
+
+// テーマボタン初期状態
+(function() {
+  const btn = document.getElementById("themeBtn");
+  if (document.body.classList.contains("light")) btn.textContent = "☀️";
+})();
+
+// ============================================================
+// チップフィルター
+// ============================================================
+// 大会名フィルターのchipは buildList() 実行後に動的追加されるため、
+// イベント委譲（#filters に対するclick監視）で対応する
+document.getElementById("filters").addEventListener("click", (e) => {
+  const chip = e.target.closest(".chip");
+  if (!chip) return;
+  document.querySelectorAll(".chip").forEach(c => c.classList.remove("active"));
+  chip.classList.add("active");
+  const f = chip.dataset.filter;
+  // 「日付」チップは常に今日の日付にリセットしてからフィルター適用
+  if (f === "date") dayIndex = defaultDayIndex();
+  applyFilter(f);
+  if (f === "date") {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  } else {
+    requestAnimationFrame(() => scrollToToday(true));
+  }
+});
+
+// 日付ナビゲーションボタン（scrollToTop=trueでページ先頭へ）
+document.getElementById("prevDay").addEventListener("click", () => {
+  if (dayIndex > 0) { dayIndex--; renderDayNav(true); }
+});
+document.getElementById("nextDay").addEventListener("click", () => {
+  if (dayIndex < DAYS.length - 1) { dayIndex++; renderDayNav(true); }
+});
+document.getElementById("jumpToday").addEventListener("click", () => {
+  dayIndex = defaultDayIndex();
+  renderDayNav(true);
+});
+
+// ============================================================
+// 初期化（fetch → インラインデータの順でフォールバック）
+// ローカルで直接開いた場合: fetchがCORSで失敗 → INLINE_MATCHESを使用
+// Netlifyなどサーバー上: fetchが成功 → matches.jsonの最新データを使用
+// ============================================================
+// 今日（または今日以降の最初の表示中セクション）へスクロール
+// smooth=true のときアニメーションあり（フィルター切替時）、false は即座（起動時）
+function scrollToToday(smooth = false) {
+  const todayV = dateVal(todayDateStr());
+  const heads = Array.from(document.querySelectorAll(".date-head:not(.hidden)"));
+  // 今日以降で最初の表示中date-headを探す
+  let target = heads.find(el => el.dataset.date && dateVal(el.dataset.date) >= todayV);
+  // なければ最後の表示中date-head（大会終了後など）
+  if (!target) target = heads[heads.length - 1];
+  if (!target) return;
+  const headerHeight = document.querySelector("header")?.offsetHeight ?? 96;
+  const y = target.getBoundingClientRect().top + window.scrollY - headerHeight;
+  window.scrollTo({ top: Math.max(0, y), behavior: smooth ? "smooth" : "instant" });
+}
+
+function initWithData(data) {
+  MATCHES = data;
+  DAYS = groupByDate(MATCHES);
+  dayIndex = defaultDayIndex();
+  buildList();
+  updateCountdown();
+  setInterval(updateCountdown, 1000);
+  // DOMが描画された後、今日の日付セクションへ即座にスクロール（アニメーションなし）
+  requestAnimationFrame(() => scrollToToday(false));
+}
+
+async function loadMatches() {
+  try {
+    const res = await fetch("matches.json?" + Date.now());
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    console.log("✅ matches.json をfetchで取得しました（" + data.length + "試合）");
+    initWithData(data);
+  } catch (e) {
+    // ローカルファイルをブラウザで直接開いた場合はCORSエラーになるため
+    // インラインデータにフォールバックする
+    console.info("fetchできなかったためインラインデータを使用します:", e.message);
+    initWithData(INLINE_MATCHES);
+  }
+}
+
+// 時計スタート
+tickClock();
+setInterval(tickClock, 30000);
+
+// データ読み込み開始
+loadMatches();
+</script>
+</body>
+</html>
