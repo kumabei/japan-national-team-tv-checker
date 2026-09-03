@@ -174,5 +174,22 @@ def merge_matches(schedule: list, broadcasts: dict) -> list:
     return matches
 
 
+def _has_broadcast(match: dict) -> bool:
+    return bool(match["tv_onair"] or match["tv_bs"] or match["tv_net"])
+
+
+def detect_new_broadcasts(old_matches: list, new_matches: list) -> list:
+    old_by_key = {(m["date"], m["time"]): m for m in old_matches}
+    new_broadcasts = []
+    for m in new_matches:
+        if not _has_broadcast(m):
+            continue
+        key = (m["date"], m["time"])
+        old = old_by_key.get(key)
+        if old is None or not _has_broadcast(old):
+            new_broadcasts.append(m)
+    return new_broadcasts
+
+
 if __name__ == "__main__":
     pass

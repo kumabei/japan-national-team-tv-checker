@@ -12,6 +12,7 @@ from scraper import (
     parse_schedule_table,
     parse_broadcast_table,
     merge_matches,
+    detect_new_broadcasts,
 )
 
 
@@ -129,3 +130,38 @@ def test_merge_matches_without_broadcast_has_empty_lists():
     m = merged[0]
     assert m["tv_onair"] == [] and m["tv_bs"] == [] and m["tv_net"] == []
     assert m["score"] is None
+
+
+def _match(date, time, team2, tv_onair=None, tv_bs=None, tv_net=None):
+    return {
+        "date": date, "time": time, "stage": "S", "team1": "日本", "team2": team2,
+        "tv_onair": tv_onair or [], "tv_bs": tv_bs or [], "tv_net": tv_net or [],
+        "is_japan": True, "score": None,
+    }
+
+
+def test_detect_new_broadcasts_finds_newly_confirmed_match():
+    old = [_match("9/24", "19:35", "パラグアイ")]  # 放送局まだ未確定
+    new = [_match("9/24", "19:35", "パラグアイ", tv_onair=["フジテレビ"])]
+    result = detect_new_broadcasts(old, new)
+    assert len(result) == 1
+    assert result[0]["tv_onair"] == ["フジテレビ"]
+
+
+def test_detect_new_broadcasts_finds_brand_new_match_with_broadcast():
+    old = []
+    new = [_match("10/1", "19:00", "韓国", tv_onair=["NHK"])]
+    result = detect_new_broadcasts(old, new)
+    assert len(result) == 1
+
+
+def test_detect_new_broadcasts_ignores_unchanged_matches():
+    old = [_match("9/24", "19:35", "パラグアイ", tv_onair=["フジテレビ"])]
+    new = [_match("9/24", "19:35", "パラグアイ", tv_onair=["フジテレビ"])]
+    assert detect_new_broadcasts(old, new) == []
+
+
+def test_detect_new_broadcasts_ignores_matches_still_without_broadcast():
+    old = [_match("10/5", "19:00", "未定")]
+    new = [_match("10/5", "19:00", "未定")]
+    assert detect_new_broadcasts(old, new) == []
