@@ -16,6 +16,7 @@ from scraper import (
     utc_iso_to_jst,
     parse_next_data_matches,
     convert_team_match,
+    sort_matches,
 )
 
 
@@ -126,6 +127,13 @@ def test_merge_matches_attaches_broadcasters_and_classifies():
     assert m["score"] == {"home": 2, "away": 1}
 
 
+def test_merge_matches_passes_through_year_when_present():
+    schedule = [{"date": "1/11", "time": "23:00", "year": 2027, "stage": "S",
+                 "team1": "日本", "team2": "インドネシア"}]
+    merged = merge_matches(schedule, {})
+    assert merged[0]["year"] == 2027
+
+
 def test_merge_matches_without_broadcast_has_empty_lists():
     schedule = [{"date": "9/24", "time": "19:35", "stage": "S",
                  "team1": "日本", "team2": "パラグアイ"}]
@@ -171,11 +179,15 @@ def test_detect_new_broadcasts_ignores_matches_still_without_broadcast():
 
 
 def test_utc_iso_to_jst_same_day():
-    assert utc_iso_to_jst("2027-01-11T14:00:00.000Z") == ("1/11", "23:00")
+    assert utc_iso_to_jst("2027-01-11T14:00:00.000Z") == ("1/11", "23:00", 2027)
 
 
 def test_utc_iso_to_jst_crosses_to_next_day():
-    assert utc_iso_to_jst("2026-06-25T23:00:00.000Z") == ("6/26", "08:00")
+    assert utc_iso_to_jst("2026-06-25T23:00:00.000Z") == ("6/26", "08:00", 2026)
+
+
+def test_utc_iso_to_jst_crosses_year_boundary():
+    assert utc_iso_to_jst("2026-12-31T16:00:00.000Z") == ("1/1", "01:00", 2027)
 
 
 NEXT_DATA_HTML = """
@@ -214,9 +226,19 @@ def test_convert_team_match_with_result_and_round():
     }
     result = convert_team_match(raw)
     assert result == {
-        "date": "6/26", "time": "08:00", "stage": "ワールドカップ グループ F",
+        "date": "6/26", "time": "08:00", "year": 2026, "stage": "ワールドカップ グループ F",
         "team1": "日本", "team2": "スウェーデン", "score1": 1, "score2": 1,
     }
+
+
+def test_convert_team_match_year_follows_jst_date_across_year_boundary():
+    raw = {
+        "startDate": "2027-01-11T14:00:00.000Z",
+        "competition": {"name": "AFC アジアカップ"}, "round": None,
+        "teamA": {"name": "日本"}, "teamB": {"name": "インドネシア"},
+        "score": None, "status": "FIXTURE",
+    }
+    assert convert_team_match(raw)["year"] == 2027
 
 
 def test_convert_team_match_omits_round_when_same_as_competition():
@@ -241,6 +263,24 @@ def test_convert_team_match_fixture_without_score_or_round():
     }
     result = convert_team_match(raw)
     assert result == {
-        "date": "1/11", "time": "23:00", "stage": "AFC アジアカップ",
+        "date": "1/11", "time": "23:00", "year": 2027, "stage": "AFC アジアカップ",
         "team1": "日本", "team2": "インドネシア",
     }
+
+
+def _m(date, time, year):
+    return {"date": date, "time": time, "year": year, "stage": "S",
+            "team1": "日本", "team2": "X", "tv_onair": [], "tv_bs": [], "tv_net": [],
+            "is_japan": True, "score": None}
+
+
+def test_sort_matches_orders_across_year_boundary():
+    matches = [_m("1/11", "23:00", 2027), _m("6/26", "08:00", 2026), _m("6/30", "02:00", 2026)]
+    result = sort_matches(matches)
+    assert [m["date"] for m in result] == ["6/26", "6/30", "1/11"]
+
+
+def test_sort_matches_orders_within_same_year():
+    matches = [_m("9/24", "19:35", 2026), _m("6/26", "08:00", 2026)]
+    result = sort_matches(matches)
+    assert [m["date"] for m in result] == ["6/26", "9/24"]

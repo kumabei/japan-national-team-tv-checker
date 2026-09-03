@@ -158,7 +158,11 @@ def parse_broadcast_table(soup) -> dict:
 def utc_iso_to_jst(iso_str: str):
     dt_utc = datetime.datetime.fromisoformat(iso_str.replace("Z", "+00:00"))
     dt_jst = dt_utc.astimezone(datetime.timezone(datetime.timedelta(hours=9)))
-    return f"{dt_jst.month}/{dt_jst.day}", f"{dt_jst.hour:02d}:{dt_jst.minute:02d}"
+    return (
+        f"{dt_jst.month}/{dt_jst.day}",
+        f"{dt_jst.hour:02d}:{dt_jst.minute:02d}",
+        dt_jst.year,
+    )
 
 
 def parse_next_data_matches(html: str) -> list:
@@ -173,7 +177,7 @@ def parse_next_data_matches(html: str) -> list:
 
 
 def convert_team_match(raw: dict):
-    date, time_str = utc_iso_to_jst(raw["startDate"])
+    date, time_str, year = utc_iso_to_jst(raw["startDate"])
     team1 = raw["teamA"]["name"]
     team2 = raw["teamB"]["name"]
 
@@ -185,7 +189,7 @@ def convert_team_match(raw: dict):
         stage = competition_name
 
     entry = {
-        "date": date, "time": time_str, "stage": stage,
+        "date": date, "time": time_str, "year": year, "stage": stage,
         "team1": team1, "team2": team2,
     }
     if raw.get("score"):
@@ -210,12 +214,15 @@ def merge_matches(schedule: list, broadcasts: dict) -> list:
         if "score1" in entry:
             score = {"home": entry["score1"], "away": entry["score2"]}
 
-        matches.append({
+        match = {
             "date": entry["date"], "time": entry["time"], "stage": entry["stage"],
             "team1": team1, "team2": team2,
             "tv_onair": tv_onair, "tv_bs": tv_bs, "tv_net": tv_net,
             "is_japan": is_japan, "score": score,
-        })
+        }
+        if "year" in entry:
+            match["year"] = entry["year"]
+        matches.append(match)
     return matches
 
 
@@ -252,6 +259,13 @@ def fetch_soup(url: str):
     res.raise_for_status()
     res.encoding = "utf-8"
     return BeautifulSoup(res.text, "html.parser")
+
+
+def sort_matches(matches: list) -> list:
+    def key(m):
+        month, day = m["date"].split("/")
+        return (m.get("year", 0), int(month), int(day), m["time"])
+    return sorted(matches, key=key)
 
 
 def fetch_team_matches(url: str) -> list:
@@ -310,7 +324,7 @@ def main() -> list:
     soup = fetch_soup(URL)
     broadcasts = parse_broadcast_table(soup)
 
-    new_matches = merge_matches(schedule, broadcasts)
+    new_matches = sort_matches(merge_matches(schedule, broadcasts))
 
     old_matches = load_old_matches()
     new_broadcasts = detect_new_broadcasts(old_matches, new_matches)

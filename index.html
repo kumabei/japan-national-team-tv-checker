@@ -491,10 +491,16 @@ function flagHtml(teamName) {
 // ============================================================
 // 日付文字列から曜日を取得
 // ============================================================
-function getDayLabel(dateStr) {
+function getDayLabel(dateStr, year) {
   const [m, d] = dateStr.split("/").map(Number);
-  const dt = new Date(2026, m - 1, d);
+  const dt = new Date(year, m - 1, d);
   return WEEKDAYS[dt.getDay()];
+}
+
+// 年をまたぐ日付を一意に識別するキー（"YYYY/M/D"）。
+// year未指定（旧データ・オフラインフォールバック等）は基準年2026で扱う。
+function fullDateKey(year, dateStr) {
+  return `${year || 2026}/${dateStr}`;
 }
 
 // ============================================================
@@ -503,17 +509,17 @@ function getDayLabel(dateStr) {
 function groupByDate(matches) {
   const map = new Map();
   for (const m of matches) {
-    if (!map.has(m.date)) {
-      map.set(m.date, { date: m.date, day: getDayLabel(m.date), matches: [] });
+    const key = fullDateKey(m.year, m.date);
+    if (!map.has(key)) {
+      map.set(key, {
+        date: m.date, year: m.year || 2026, key,
+        day: getDayLabel(m.date, m.year || 2026), matches: [],
+      });
     }
-    map.get(m.date).matches.push(m);
+    map.get(key).matches.push(m);
   }
-  // 日付順にソート
-  return [...map.values()].sort((a, b) => {
-    const [am, ad] = a.date.split("/").map(Number);
-    const [bm, bd] = b.date.split("/").map(Number);
-    return (am * 32 + ad) - (bm * 32 + bd);
-  });
+  // 日付順にソート（年をまたいでも正しく並ぶ）
+  return [...map.values()].sort((a, b) => dateVal(a.key) - dateVal(b.key));
 }
 
 // ============================================================
@@ -606,12 +612,12 @@ function buildList() {
   });
 
   let html = "";
-  const todayKey = todayDateStr();
+  const tk = todayKey();
   const TERRESTRIAL = new Set(["NHK","日テレ","フジテレビ","テレビ朝日","TBS"]);
 
   for (const group of DAYS) {
-    const isToday = group.date === todayKey;
-    html += `<div class="date-head" data-date="${group.date}">
+    const isToday = group.key === tk;
+    html += `<div class="date-head" data-date="${group.key}">
       <span class="d">${group.date}（${group.day}）</span>
       ${isToday ? `<span class="today-tag">TODAY</span>` : ""}
     </div>`;
@@ -631,7 +637,7 @@ function buildList() {
         : "";
 
       html += `<div class="match${m.is_japan ? " jp" : ""}"
-        data-date="${m.date}"
+        data-date="${fullDateKey(m.year, m.date)}"
         data-time="${m.time}"
         data-jp="${m.is_japan}"
         data-onair="${hasOnair}"
@@ -663,7 +669,7 @@ function buildList() {
     const head = e.target.closest(".date-head");
     if (!head) return;
     const date = head.dataset.date;
-    const idx = DAYS.findIndex(g => g.date === date);
+    const idx = DAYS.findIndex(g => g.key === date);
     if (idx < 0) return;
     dayIndex = idx;
     document.querySelectorAll(".chip").forEach(c => c.classList.remove("active"));
@@ -676,17 +682,21 @@ function buildList() {
 // ============================================================
 // 日付比較用ヘルパー
 // ============================================================
-function dateVal(str) {
-  const [m, d] = str.split("/").map(Number);
-  return m * 32 + d;
+function dateVal(fullKey) {
+  const [y, m, d] = fullKey.split("/").map(Number);
+  return y * 372 + m * 32 + d;
 }
 function todayDateStr() {
   const now = new Date();
   return `${now.getMonth() + 1}/${now.getDate()}`;
 }
+function todayKey() {
+  const now = new Date();
+  return fullDateKey(now.getFullYear(), todayDateStr());
+}
 function defaultDayIndex() {
-  const tv = dateVal(todayDateStr());
-  let idx = DAYS.findIndex(g => dateVal(g.date) >= tv);
+  const tv = dateVal(todayKey());
+  let idx = DAYS.findIndex(g => dateVal(g.key) >= tv);
   return idx === -1 ? Math.max(0, DAYS.length - 1) : idx;
 }
 
@@ -700,8 +710,7 @@ let currentFilter = "all"; // 現在アクティブなフィルター
 function renderDayNav(scrollToTop = false) {
   if (!DAYS.length) return;
   const group = DAYS[dayIndex];
-  const tk = todayDateStr();
-  const isToday = group.date === tk;
+  const isToday = group.key === todayKey();
   document.getElementById("dayLabel").innerHTML =
     `${group.date}（${group.day}）${isToday ? `<span class="today-tag" style="margin-left:6px;">TODAY</span>` : ""}`;
   document.getElementById("prevDay").disabled = dayIndex <= 0;
@@ -709,7 +718,7 @@ function renderDayNav(scrollToTop = false) {
 
   document.querySelectorAll(".date-head").forEach(h => h.classList.add("hidden"));
   document.querySelectorAll(".match").forEach(el => {
-    el.classList.toggle("hidden", el.dataset.date !== group.date);
+    el.classList.toggle("hidden", el.dataset.date !== group.key);
   });
 
   if (scrollToTop) {
@@ -764,7 +773,7 @@ function updateCountdown() {
     if (!m.is_japan) return false;
     const [h, min] = m.time.split(":").map(Number);
     const [mo, d] = m.date.split("/").map(Number);
-    const t = new Date(2026, mo - 1, d, h, min);
+    const t = new Date(m.year || 2026, mo - 1, d, h, min);
     return t > now;
   });
 
@@ -772,7 +781,7 @@ function updateCountdown() {
 
   const [h, min] = next.time.split(":").map(Number);
   const [mo, d] = next.date.split("/").map(Number);
-  const target = new Date(2026, mo - 1, d, h, min);
+  const target = new Date(next.year || 2026, mo - 1, d, h, min);
   const diff = Math.max(0, target - now);
 
   const days  = Math.floor(diff / 86400000);
@@ -866,7 +875,7 @@ document.getElementById("jumpToday").addEventListener("click", () => {
 // 今日（または今日以降の最初の表示中セクション）へスクロール
 // smooth=true のときアニメーションあり（フィルター切替時）、false は即座（起動時）
 function scrollToToday(smooth = false) {
-  const todayV = dateVal(todayDateStr());
+  const todayV = dateVal(todayKey());
   const heads = Array.from(document.querySelectorAll(".date-head:not(.hidden)"));
   // 今日以降で最初の表示中date-headを探す
   let target = heads.find(el => el.dataset.date && dateVal(el.dataset.date) >= todayV);
