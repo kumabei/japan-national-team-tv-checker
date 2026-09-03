@@ -21,3 +21,17 @@ python scraper.py
 ```
 
 新しく放送予定が確定した試合があれば、コンソールに一覧が出力されます。
+
+## テストの実行方法
+
+```bash
+pip install pytest
+python -m pytest tests/test_scraper.py -v
+```
+
+## icon.png の再生成方法
+
+```bash
+pip install Pillow
+python generate_icon.py
+```
