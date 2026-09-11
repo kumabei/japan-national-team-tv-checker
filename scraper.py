@@ -54,6 +54,19 @@ def normalize_broadcaster(name: str) -> str:
     return BROADCASTER_MAP.get(name, name)
 
 
+def normalize_stage(stage: str) -> str:
+    """大会名の表記ゆれを吸収する。
+
+    goal.comの取得元（スケジュール表／構造化データ）が、同じ大会でも
+    「AFC アジアカップ」「AFCアジアカップ」のように半角スペースの有無を
+    その都度変えて返してくることがあり、意味は同じなのにmatches.jsonへ
+    無意味な差分が発生していた。ここで表記を一本化して差分を防ぐ。
+    """
+    stage = re.sub(r"\s+", " ", stage.strip())
+    stage = stage.replace("AFC アジアカップ", "AFCアジアカップ")
+    return stage
+
+
 def classify_broadcaster(name: str) -> str:
     if name in TERRESTRIAL_BROADCASTERS:
         return "onair"
@@ -130,7 +143,7 @@ def parse_schedule_table(soup) -> list:
         if card is None:
             continue
         date, time_str = date_time
-        entry = {"date": date, "time": time_str, "stage": cells[1], **card}
+        entry = {"date": date, "time": time_str, "stage": normalize_stage(cells[1]), **card}
         results.append(entry)
     return results
 
@@ -187,6 +200,7 @@ def convert_team_match(raw: dict):
         stage = f"{competition_name} {round_name}"
     else:
         stage = competition_name
+    stage = normalize_stage(stage)
 
     entry = {
         "date": date, "time": time_str, "year": year, "stage": stage,
