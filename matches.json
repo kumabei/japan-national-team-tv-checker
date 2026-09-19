@@ -357,20 +357,27 @@
     "stage": "ワールドカップ 決勝ステージ",
     "team1": "ブラジル",
     "team2": "日本",
-    "tv_onair": [
-      "フジテレビ"
-    ],
-    "tv_bs": [
-      "NHK BS"
-    ],
-    "tv_net": [
-      "DAZN"
-    ],
+    "tv_onair": [],
+    "tv_bs": [],
+    "tv_net": [],
     "is_japan": true,
     "score": {
       "home": 2,
       "away": 1
     },
+    "year": 2026
+  },
+  {
+    "date": "9/24",
+    "time": "19:05",
+    "stage": "親善試合",
+    "team1": "日本",
+    "team2": "ウルグアイ",
+    "tv_onair": [],
+    "tv_bs": [],
+    "tv_net": [],
+    "is_japan": true,
+    "score": null,
     "year": 2026
   },
   {
