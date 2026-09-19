@@ -212,7 +212,12 @@ def convert_team_match(raw: dict):
     return entry
 
 
-def merge_matches(schedule: list, broadcasts: dict) -> list:
+def merge_matches(schedule: list, broadcasts: dict, old_matches: list = None) -> list:
+    # 終了した試合は放送予定ページの一覧から消えるため、broadcastsに
+    # 情報が無いことは「放送局なし」ではなく「取得元から既に落ちただけ」の
+    # ことが多い。新規取得が空なら、既存のmatches.jsonの値を引き継ぐ
+    # （過去にブラジル戦の放送局情報が空上書きされる事故があったための対策）。
+    old_by_key = {(m["date"], m["time"]): m for m in (old_matches or [])}
     matches = []
     for entry in schedule:
         key = (entry["date"], entry["time"])
@@ -220,6 +225,13 @@ def merge_matches(schedule: list, broadcasts: dict) -> list:
         tv_onair = [b for b in broadcasters if classify_broadcaster(b) == "onair"]
         tv_bs = [b for b in broadcasters if classify_broadcaster(b) == "bs"]
         tv_net = [b for b in broadcasters if classify_broadcaster(b) == "net"]
+
+        if not (tv_onair or tv_bs or tv_net):
+            old = old_by_key.get(key)
+            if old and (old.get("tv_onair") or old.get("tv_bs") or old.get("tv_net")):
+                tv_onair = old.get("tv_onair", [])
+                tv_bs = old.get("tv_bs", [])
+                tv_net = old.get("tv_net", [])
 
         team1, team2 = entry["team1"], entry["team2"]
         is_japan = any(name in team1 or name in team2 for name in JAPAN_NAMES)
@@ -338,9 +350,9 @@ def main() -> list:
     soup = fetch_soup(URL)
     broadcasts = parse_broadcast_table(soup)
 
-    new_matches = sort_matches(merge_matches(schedule, broadcasts))
-
     old_matches = load_old_matches()
+    new_matches = sort_matches(merge_matches(schedule, broadcasts, old_matches))
+
     new_broadcasts = detect_new_broadcasts(old_matches, new_matches)
 
     save_matches(new_matches)
