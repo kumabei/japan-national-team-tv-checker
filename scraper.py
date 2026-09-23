@@ -17,6 +17,16 @@ TEAM_SCHEDULE_URL = (
     "https://www.goal.com/jp/%E3%83%81%E3%83%BC%E3%83%A0/%E6%97%A5%E6%9C%AC/"
     "%E6%97%A5%E7%A8%8B%E3%83%BB%E7%B5%90%E6%9E%9C/6duaxcbrofil112qfq4v895go"
 )
+# なでしこジャパン（女子A代表）: 日程結果テーブル＋放送予定テーブルを持つ記事ページ
+NADESHIKO_URL = (
+    "https://www.goal.com/jp/%E3%83%8B%E3%83%A5%E3%83%BC%E3%82%B9/"
+    "nadeshiko-japan-schedule-broadcast/4uj3vbwdkhz51viqbodsrfcz8"
+)
+# 若い世代（U-21など）: 直近数日分の日本関連試合が日付ごとのテーブルで並ぶ「生きているページ」
+YOUTH_LIST_URL = (
+    "https://www.goal.com/jp/%E3%83%AA%E3%82%B9%E3%83%88/"
+    "football-broadcast-schedule-japan/17wlgacoelh4x1vawfvh8kiq9o"
+)
 OUTPUT_FILE = os.path.join(os.path.dirname(__file__), "matches.json")
 
 BROADCASTER_MAP = {
@@ -38,15 +48,43 @@ BROADCASTER_MAP = {
     "TBS系列": "TBS",
     "テレビ東京": "テレビ東京",
     "テレ東": "テレビ東京",
+    "日本テレビ系列": "日テレ",
+    "テレビ朝日系列": "テレビ朝日",
+    "テレビ東京系列": "テレビ東京",
+    "NHK総合テレビ": "NHK",
     "DAZN": "DAZN",
     "ABEMA": "ABEMA",
+    "U-NEXT": "U-NEXT",
+    # TVerは地上波の同時配信。地上波局と重複掲載されるが、シンプルさを優先してnet扱い
+    "TVer": "TVer",
 }
 
 TERRESTRIAL_BROADCASTERS = {"NHK", "日テレ", "フジテレビ", "テレビ朝日", "TBS", "テレビ東京"}
 BS_BROADCASTERS = {"NHK BS"}
-NET_BROADCASTERS = {"DAZN", "ABEMA"}
+NET_BROADCASTERS = {"DAZN", "ABEMA", "U-NEXT", "TVer"}
 
 JAPAN_NAMES = {"日本", "サムライブルー", "日本代表"}
+
+# チーム区分
+TEAM_A = "a"
+TEAM_NADESHIKO = "nadeshiko"
+TEAM_YOUTH = "youth"
+TEAM_LABELS = {TEAM_A: "日本代表", TEAM_NADESHIKO: "なでしこジャパン"}
+TEAM_PRIORITY = {TEAM_A: 0, TEAM_NADESHIKO: 1, TEAM_YOUTH: 2}
+
+# 「若い世代」ページ（サッカー全般の放送一覧）からA代表の試合を除外するための大会名
+A_TEAM_STAGE_KEYWORDS = (
+    "キリンチャレンジカップ", "キリンカップ", "ワールドカップ", "W杯",
+    "アジア最終予選", "最終予選", "アジアカップ",
+)
+# 上のA代表キーワードを含んでいても、これらを含むなら「若い世代」扱いにする
+YOUTH_STAGE_KEYWORDS = (
+    "U-", "U15", "U16", "U17", "U18", "U19", "U20", "U21", "U22", "U23", "U24",
+    "ユース", "オリンピック", "五輪", "アジア大会", "アジア競技大会", "女子", "なでしこ",
+)
+
+# 放送欄で「局名なし」を意味するトークン
+NO_BROADCAST_TOKENS = {"未定", "なし", "未発表", "-", "‐", "―", "ー", "−"}
 
 
 def normalize_broadcaster(name: str) -> str:
@@ -128,6 +166,78 @@ def parse_broadcast_text(text: str) -> list:
     return broadcasters
 
 
+def parse_broadcast_tokens(text: str) -> list:
+    """スペース区切りの放送局トークン列をパースする。
+
+    A代表ページの `【テレビ】局名(時刻)` 形式とは違い、なでしこページの
+    `【放送】TBS系列(録画) 【配信】 U-NEXT` や、若い世代ページの
+    `U-NEXT TBS系列 TVer` のように、括弧が無いトークンが並ぶ形式に対応する。
+    """
+    text = re.sub(r"【[^】]*】", " ", text)
+    text = re.sub(r"[(（][^)）]*[)）]", " ", text)
+    broadcasters = []
+    for token in text.split():
+        token = token.strip("、,・/／")
+        if not token or token in NO_BROADCAST_TOKENS:
+            continue
+        name = normalize_broadcaster(token)
+        if name and name not in broadcasters:
+            broadcasters.append(name)
+    return broadcasters
+
+
+def infer_year(date_str: str, today=None, past_threshold_days: int = 90) -> int:
+    """西暦の無い「月/日」から年を推定する。
+
+    今日より少し前までは今年の試合とみなし、極端に古い（既定では90日以上前の）
+    月日は年をまたいだ来年の試合とみなす。直近数日分しか載らない
+    「若い世代」ページのような用途を想定している。
+    """
+    today = today or datetime.date.today()
+    month, day = (int(x) for x in date_str.split("/"))
+    try:
+        candidate = datetime.date(today.year, month, day)
+    except ValueError:  # 2/29 など
+        return today.year
+    if (today - candidate).days >= past_threshold_days:
+        return today.year + 1
+    return today.year
+
+
+def assign_years_sequential(entries: list, today=None) -> list:
+    """日付昇順に並んだスケジュール行へ年を振る。
+
+    シーズン一覧のように過去の試合も未来の試合も混ざるページでは、
+    infer_year()の「過去なら来年」判定だと終わった試合が来年に化ける。
+    最初の「今日以降」の行を今年として前後へ伸ばし、月日が巻き戻った所で
+    年を繰り上げる（遡るときは繰り下げる）。
+    """
+    today = today or datetime.date.today()
+    if not entries:
+        return entries
+    keys = [tuple(int(x) for x in e["date"].split("/")) for e in entries]
+    anchor = next(
+        (i for i, k in enumerate(keys) if k >= (today.month, today.day)),
+        len(entries) - 1,
+    )
+    years = [None] * len(entries)
+    years[anchor] = today.year
+    for i in range(anchor + 1, len(entries)):
+        years[i] = years[i - 1] + (1 if keys[i] < keys[i - 1] else 0)
+    for i in range(anchor - 1, -1, -1):
+        years[i] = years[i + 1] - (1 if keys[i] > keys[i + 1] else 0)
+    for entry, year in zip(entries, years):
+        entry["year"] = year
+    return entries
+
+
+def is_youth_stage(stage: str) -> bool:
+    """大会名から「若い世代（A代表以外）」の試合かどうかを判定する。"""
+    if any(k in stage for k in YOUTH_STAGE_KEYWORDS):
+        return True
+    return not any(k in stage for k in A_TEAM_STAGE_KEYWORDS)
+
+
 def parse_schedule_table(soup) -> list:
     table = soup.find_all("table")[0]
     rows = table.find_all("tr")
@@ -148,7 +258,8 @@ def parse_schedule_table(soup) -> list:
     return results
 
 
-def parse_broadcast_table(soup) -> dict:
+def parse_broadcast_table(soup, text_parser=None) -> dict:
+    text_parser = text_parser or parse_broadcast_text
     tables = soup.find_all("table")
     if len(tables) == 0:
         return {}
@@ -164,7 +275,7 @@ def parse_broadcast_table(soup) -> dict:
         date_time = parse_date_time(cells[0])
         if date_time is None:
             continue
-        result[date_time] = parse_broadcast_text(cells[2])
+        result[date_time] = text_parser(cells[2])
     return result
 
 
@@ -212,7 +323,7 @@ def convert_team_match(raw: dict):
     return entry
 
 
-def merge_matches(schedule: list, broadcasts: dict) -> list:
+def merge_matches(schedule: list, broadcasts: dict, team: str = TEAM_A) -> list:
     matches = []
     for entry in schedule:
         key = (entry["date"], entry["time"])
@@ -232,7 +343,7 @@ def merge_matches(schedule: list, broadcasts: dict) -> list:
             "date": entry["date"], "time": entry["time"], "stage": entry["stage"],
             "team1": team1, "team2": team2,
             "tv_onair": tv_onair, "tv_bs": tv_bs, "tv_net": tv_net,
-            "is_japan": is_japan, "score": score,
+            "is_japan": is_japan, "score": score, "team": team,
         }
         if "year" in entry:
             match["year"] = entry["year"]
@@ -240,17 +351,92 @@ def merge_matches(schedule: list, broadcasts: dict) -> list:
     return matches
 
 
+def parse_nadeshiko_page(soup, today=None) -> list:
+    """なでしこジャパンの記事ページ（日程テーブル＋放送テーブル）をパースする。"""
+    schedule = assign_years_sequential(parse_schedule_table(soup), today)
+    broadcasts = parse_broadcast_table(soup, text_parser=parse_broadcast_tokens)
+    return merge_matches(schedule, broadcasts, team=TEAM_NADESHIKO)
+
+
+DATE_HEADING_RE = re.compile(r"(\d{1,2})月(\d{1,2})日")
+
+
+def parse_youth_list_page(soup, today=None) -> list:
+    """サッカー全般の放送一覧ページから、A代表以外の日本戦を抜き出す。
+
+    日付見出し（h2/h3）の直後にその日のテーブルが1つ並ぶ構造。
+    テーブルは [キックオフ, 対戦カード, 大会名, 放送チャンネル] の4列。
+    """
+    entries = []
+    broadcasts = {}
+    current_date = None
+    for el in soup.find_all(["h1", "h2", "h3", "h4", "table"]):
+        if el.name != "table":
+            m = DATE_HEADING_RE.search(el.get_text(" ", strip=True))
+            if m:
+                current_date = f"{int(m.group(1))}/{int(m.group(2))}"
+            continue
+        if current_date is None:
+            continue
+        for row in el.find_all("tr")[1:]:
+            cells = [c.get_text(" ", strip=True) for c in row.find_all(["td", "th"])]
+            if len(cells) < 4:
+                continue
+            tm = re.match(r"^(\d{1,2}):(\d{2})", cells[0].strip())
+            if not tm:
+                continue
+            card = parse_schedule_card(cells[1])
+            if card is None:
+                continue
+            if not any(n in card["team1"] or n in card["team2"] for n in JAPAN_NAMES):
+                continue
+            stage = normalize_stage(cells[2])
+            if not is_youth_stage(stage):
+                continue  # A代表の試合は専用ソースでカバー済み
+            time_str = f"{int(tm.group(1)):02d}:{tm.group(2)}"
+            entries.append({
+                "date": current_date, "time": time_str,
+                "year": infer_year(current_date, today),
+                "stage": stage, **card,
+            })
+            broadcasts[(current_date, time_str)] = parse_broadcast_tokens(cells[3])
+    return merge_matches(entries, broadcasts, team=TEAM_YOUTH)
+
+
+def dedupe_matches(matches: list) -> list:
+    """同じ（年・日付・時刻）の試合が複数ソースから来た場合、優先度の高い方を残す。
+
+    例: アジア競技大会の女子戦は、なでしこページと放送一覧ページの
+    両方に載る。A代表 > なでしこ > 若い世代 の順で優先する。
+    """
+    best = {}
+    order = []
+    for m in matches:
+        key = (m.get("year"), m["date"], m["time"])
+        current = best.get(key)
+        if current is None:
+            best[key] = m
+            order.append(key)
+        elif TEAM_PRIORITY.get(m.get("team", TEAM_A), 9) < \
+                TEAM_PRIORITY.get(current.get("team", TEAM_A), 9):
+            best[key] = m
+    return [best[k] for k in order]
+
+
 def _has_broadcast(match: dict) -> bool:
     return bool(match["tv_onair"] or match["tv_bs"] or match["tv_net"])
 
 
 def detect_new_broadcasts(old_matches: list, new_matches: list) -> list:
-    old_by_key = {(m["date"], m["time"]): m for m in old_matches}
+    def _key(m):
+        return (m.get("team", TEAM_A), m["date"], m["time"])
+
+    old_by_key = {_key(m): m for m in old_matches}
     new_broadcasts = []
     for m in new_matches:
         if not _has_broadcast(m):
             continue
-        key = (m["date"], m["time"])
+        key = _key(m)
         old = old_by_key.get(key)
         if old is None or not _has_broadcast(old):
             new_broadcasts.append(m)
@@ -307,6 +493,14 @@ def fetch_team_matches(url: str) -> list:
     return matches
 
 
+def fetch_nadeshiko_matches(url: str = NADESHIKO_URL) -> list:
+    return parse_nadeshiko_page(fetch_soup(url))
+
+
+def fetch_youth_matches(url: str = YOUTH_LIST_URL) -> list:
+    return parse_youth_list_page(fetch_soup(url))
+
+
 def load_old_matches() -> list:
     if not os.path.exists(OUTPUT_FILE):
         return []
@@ -326,7 +520,9 @@ def print_new_broadcasts(new_broadcasts: list):
     print(f"新しく放送予定が確定した試合が {len(new_broadcasts)} 件あります:")
     for m in new_broadcasts:
         stations = m["tv_onair"] + m["tv_bs"] + m["tv_net"]
-        print(f"  {m['date']} {m['time']}〜 {m['team1']} vs {m['team2']}"
+        team = m.get("team", TEAM_A)
+        label = TEAM_LABELS.get(team) or m["stage"]
+        print(f"  [{label}] {m['date']} {m['time']}〜 {m['team1']} vs {m['team2']}"
               f"（{m['stage']}） {'・'.join(stations)}")
 
 
@@ -337,8 +533,20 @@ def main() -> list:
     print(f"取得中: {URL}")
     soup = fetch_soup(URL)
     broadcasts = parse_broadcast_table(soup)
+    a_matches = merge_matches(schedule, broadcasts, team=TEAM_A)
+    print(f"  A代表: {len(a_matches)}試合")
 
-    new_matches = sort_matches(merge_matches(schedule, broadcasts))
+    print(f"取得中: {NADESHIKO_URL}")
+    nadeshiko_matches = fetch_nadeshiko_matches()
+    print(f"  なでしこジャパン: {len(nadeshiko_matches)}試合")
+
+    print(f"取得中: {YOUTH_LIST_URL}")
+    youth_matches = fetch_youth_matches()
+    print(f"  若い世代: {len(youth_matches)}試合")
+
+    new_matches = sort_matches(
+        dedupe_matches(a_matches + nadeshiko_matches + youth_matches)
+    )
 
     old_matches = load_old_matches()
     new_broadcasts = detect_new_broadcasts(old_matches, new_matches)

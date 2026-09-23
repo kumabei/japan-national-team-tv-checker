@@ -11,6 +11,7 @@ OUTPUT = os.path.join(os.path.dirname(__file__), "icon.png")
 BG_COLOR = (11, 26, 51)       # サムライブルー(紺)
 ACCENT_COLOR = (0, 160, 233)  # 水色アクセント
 TEXT_COLOR = (255, 255, 255)
+FLAG_RED = (188, 0, 45)       # 日の丸の赤
 
 
 def generate():
@@ -19,6 +20,11 @@ def generate():
 
     # 角丸っぽい縁取り(アクセントカラーの枠)
     draw.rectangle([4, 4, SIZE - 5, SIZE - 5], outline=ACCENT_COLOR, width=6)
+
+    # 日の丸(中央、大きな赤丸)
+    sun_r = SIZE * 0.38
+    cx, cy = SIZE / 2, SIZE / 2
+    draw.ellipse([cx - sun_r, cy - sun_r, cx + sun_r, cy + sun_r], fill=FLAG_RED)
 
     try:
         font_large = ImageFont.truetype("meiryob.ttc", 64)
@@ -37,7 +43,7 @@ def generate():
     bbox2 = draw.textbbox((0, 0), text2, font=font_small)
     w2, h2 = bbox2[2] - bbox2[0], bbox2[3] - bbox2[1]
     draw.text(((SIZE - w2) / 2 - bbox2[0], SIZE * 0.68 - h2 / 2 - bbox2[1]),
-              text2, font=font_small, fill=ACCENT_COLOR)
+              text2, font=font_small, fill=TEXT_COLOR)
 
     img.save(OUTPUT, "PNG")
     print(f"アイコンを保存しました: {OUTPUT}")

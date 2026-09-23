@@ -13,6 +13,7 @@
       "home": 5,
       "away": 0
     },
+    "team": "a",
     "year": 2023
   },
   {
@@ -29,6 +30,7 @@
       "home": 0,
       "away": 5
     },
+    "team": "a",
     "year": 2023
   },
   {
@@ -45,6 +47,7 @@
       "home": 1,
       "away": 0
     },
+    "team": "a",
     "year": 2024
   },
   {
@@ -61,6 +64,7 @@
       "home": 0,
       "away": 3
     },
+    "team": "a",
     "year": 2024
   },
   {
@@ -77,6 +81,7 @@
       "home": 0,
       "away": 5
     },
+    "team": "a",
     "year": 2024
   },
   {
@@ -93,6 +98,7 @@
       "home": 5,
       "away": 0
     },
+    "team": "a",
     "year": 2024
   },
   {
@@ -109,6 +115,7 @@
       "home": 7,
       "away": 0
     },
+    "team": "a",
     "year": 2024
   },
   {
@@ -125,6 +132,7 @@
       "home": 0,
       "away": 5
     },
+    "team": "a",
     "year": 2024
   },
   {
@@ -141,6 +149,7 @@
       "home": 0,
       "away": 2
     },
+    "team": "a",
     "year": 2024
   },
   {
@@ -157,6 +166,7 @@
       "home": 1,
       "away": 1
     },
+    "team": "a",
     "year": 2024
   },
   {
@@ -173,6 +183,7 @@
       "home": 0,
       "away": 4
     },
+    "team": "a",
     "year": 2024
   },
   {
@@ -189,6 +200,7 @@
       "home": 1,
       "away": 3
     },
+    "team": "a",
     "year": 2024
   },
   {
@@ -205,6 +217,7 @@
       "home": 2,
       "away": 0
     },
+    "team": "a",
     "year": 2025
   },
   {
@@ -221,6 +234,7 @@
       "home": 0,
       "away": 0
     },
+    "team": "a",
     "year": 2025
   },
   {
@@ -237,6 +251,7 @@
       "home": 1,
       "away": 0
     },
+    "team": "a",
     "year": 2025
   },
   {
@@ -253,7 +268,110 @@
       "home": 6,
       "away": 0
     },
+    "team": "a",
     "year": 2025
+  },
+  {
+    "date": "3/4",
+    "time": "14:00",
+    "stage": "AFC女子アジアカップ2026 グループステージ第1節",
+    "team1": "日本",
+    "team2": "チャイニーズ・タイペイ",
+    "tv_onair": [],
+    "tv_bs": [],
+    "tv_net": [],
+    "is_japan": true,
+    "score": {
+      "home": 2,
+      "away": 0
+    },
+    "team": "nadeshiko",
+    "year": 2026
+  },
+  {
+    "date": "3/7",
+    "time": "20:00",
+    "stage": "AFC女子アジアカップ2026 グループステージ第2節",
+    "team1": "インド",
+    "team2": "日本",
+    "tv_onair": [],
+    "tv_bs": [],
+    "tv_net": [],
+    "is_japan": true,
+    "score": {
+      "home": 0,
+      "away": 11
+    },
+    "team": "nadeshiko",
+    "year": 2026
+  },
+  {
+    "date": "3/10",
+    "time": "18:00",
+    "stage": "AFC女子アジアカップ2026 グループステージ第3節",
+    "team1": "日本",
+    "team2": "ベトナム",
+    "tv_onair": [],
+    "tv_bs": [],
+    "tv_net": [],
+    "is_japan": true,
+    "score": {
+      "home": 4,
+      "away": 0
+    },
+    "team": "nadeshiko",
+    "year": 2026
+  },
+  {
+    "date": "3/15",
+    "time": "14:00",
+    "stage": "AFC女子アジアカップ2026 準々決勝",
+    "team1": "日本",
+    "team2": "フィリピン",
+    "tv_onair": [],
+    "tv_bs": [],
+    "tv_net": [],
+    "is_japan": true,
+    "score": {
+      "home": 7,
+      "away": 0
+    },
+    "team": "nadeshiko",
+    "year": 2026
+  },
+  {
+    "date": "3/18",
+    "time": "18:00",
+    "stage": "AFC女子アジアカップ2026 準決勝",
+    "team1": "韓国",
+    "team2": "日本",
+    "tv_onair": [],
+    "tv_bs": [],
+    "tv_net": [],
+    "is_japan": true,
+    "score": {
+      "home": 1,
+      "away": 4
+    },
+    "team": "nadeshiko",
+    "year": 2026
+  },
+  {
+    "date": "3/21",
+    "time": "18:00",
+    "stage": "AFC女子アジアカップ2026 決勝",
+    "team1": "オーストラリア",
+    "team2": "日本",
+    "tv_onair": [],
+    "tv_bs": [],
+    "tv_net": [],
+    "is_japan": true,
+    "score": {
+      "home": 0,
+      "away": 1
+    },
+    "team": "nadeshiko",
+    "year": 2026
   },
   {
     "date": "3/29",
@@ -269,6 +387,7 @@
       "home": 0,
       "away": 1
     },
+    "team": "a",
     "year": 2026
   },
   {
@@ -285,6 +404,58 @@
       "home": 0,
       "away": 1
     },
+    "team": "a",
+    "year": 2026
+  },
+  {
+    "date": "4/12",
+    "time": "06:30",
+    "stage": "国際親善試合",
+    "team1": "日本",
+    "team2": "アメリカ",
+    "tv_onair": [],
+    "tv_bs": [],
+    "tv_net": [],
+    "is_japan": true,
+    "score": {
+      "home": 1,
+      "away": 2
+    },
+    "team": "nadeshiko",
+    "year": 2026
+  },
+  {
+    "date": "4/15",
+    "time": "11:00",
+    "stage": "国際親善試合",
+    "team1": "日本",
+    "team2": "アメリカ",
+    "tv_onair": [],
+    "tv_bs": [],
+    "tv_net": [],
+    "is_japan": true,
+    "score": {
+      "home": 1,
+      "away": 0
+    },
+    "team": "nadeshiko",
+    "year": 2026
+  },
+  {
+    "date": "4/18",
+    "time": "10:00",
+    "stage": "国際親善試合",
+    "team1": "日本",
+    "team2": "アメリカ",
+    "tv_onair": [],
+    "tv_bs": [],
+    "tv_net": [],
+    "is_japan": true,
+    "score": {
+      "home": 0,
+      "away": 3
+    },
+    "team": "nadeshiko",
     "year": 2026
   },
   {
@@ -301,6 +472,41 @@
       "home": 1,
       "away": 0
     },
+    "team": "a",
+    "year": 2026
+  },
+  {
+    "date": "6/6",
+    "time": "15:50",
+    "stage": "国際親善試合",
+    "team1": "日本",
+    "team2": "南アフリカ",
+    "tv_onair": [],
+    "tv_bs": [],
+    "tv_net": [],
+    "is_japan": true,
+    "score": {
+      "home": 5,
+      "away": 0
+    },
+    "team": "nadeshiko",
+    "year": 2026
+  },
+  {
+    "date": "6/9",
+    "time": "15:30",
+    "stage": "トレーニングマッチ",
+    "team1": "日本",
+    "team2": "南アフリカ",
+    "tv_onair": [],
+    "tv_bs": [],
+    "tv_net": [],
+    "is_japan": true,
+    "score": {
+      "home": 0,
+      "away": 1
+    },
+    "team": "nadeshiko",
     "year": 2026
   },
   {
@@ -317,6 +523,7 @@
       "home": 2,
       "away": 2
     },
+    "team": "a",
     "year": 2026
   },
   {
@@ -333,6 +540,7 @@
       "home": 0,
       "away": 4
     },
+    "team": "a",
     "year": 2026
   },
   {
@@ -349,6 +557,7 @@
       "home": 1,
       "away": 1
     },
+    "team": "a",
     "year": 2026
   },
   {
@@ -365,6 +574,77 @@
       "home": 2,
       "away": 1
     },
+    "team": "a",
+    "year": 2026
+  },
+  {
+    "date": "9/14",
+    "time": "19:30",
+    "stage": "第20回アジア競技大会 グループステージ第1節",
+    "team1": "日本",
+    "team2": "タイ",
+    "tv_onair": [],
+    "tv_bs": [],
+    "tv_net": [],
+    "is_japan": true,
+    "score": {
+      "home": 8,
+      "away": 0
+    },
+    "team": "nadeshiko",
+    "year": 2026
+  },
+  {
+    "date": "9/17",
+    "time": "19:30",
+    "stage": "第20回アジア競技大会 グループステージ第2節",
+    "team1": "ベトナム",
+    "team2": "日本",
+    "tv_onair": [],
+    "tv_bs": [],
+    "tv_net": [],
+    "is_japan": true,
+    "score": {
+      "home": 0,
+      "away": 8
+    },
+    "team": "nadeshiko",
+    "year": 2026
+  },
+  {
+    "date": "9/21",
+    "time": "19:30",
+    "stage": "第20回アジア競技大会 グループステージ第3節",
+    "team1": "日本",
+    "team2": "チャイニーズ・タイペイ",
+    "tv_onair": [],
+    "tv_bs": [],
+    "tv_net": [],
+    "is_japan": true,
+    "score": {
+      "home": 4,
+      "away": 0
+    },
+    "team": "nadeshiko",
+    "year": 2026
+  },
+  {
+    "date": "9/23",
+    "time": "19:30",
+    "stage": "アジア大会男子第3節",
+    "team1": "日本",
+    "team2": "タイ",
+    "tv_onair": [
+      "TBS"
+    ],
+    "tv_bs": [],
+    "tv_net": [
+      "U-NEXT",
+      "TVer"
+    ],
+    "is_japan": true,
+    "score": null,
+    "team": "youth",
     "year": 2026
   },
   {
@@ -378,6 +658,85 @@
     "tv_net": [],
     "is_japan": true,
     "score": null,
+    "team": "a",
+    "year": 2026
+  },
+  {
+    "date": "9/25",
+    "time": "19:30",
+    "stage": "第20回アジア競技大会 準々決勝",
+    "team1": "日本",
+    "team2": "フィリピン",
+    "tv_onair": [
+      "TBS"
+    ],
+    "tv_bs": [],
+    "tv_net": [
+      "U-NEXT"
+    ],
+    "is_japan": true,
+    "score": null,
+    "team": "nadeshiko",
+    "year": 2026
+  },
+  {
+    "date": "10/10",
+    "time": "03:00",
+    "stage": "国際親善試合",
+    "team1": "日本",
+    "team2": "ハイチ",
+    "tv_onair": [],
+    "tv_bs": [],
+    "tv_net": [],
+    "is_japan": true,
+    "score": null,
+    "team": "nadeshiko",
+    "year": 2026
+  },
+  {
+    "date": "10/14",
+    "time": "00:45",
+    "stage": "国際親善試合",
+    "team1": "日本",
+    "team2": "ドイツ",
+    "tv_onair": [],
+    "tv_bs": [],
+    "tv_net": [],
+    "is_japan": true,
+    "score": null,
+    "team": "nadeshiko",
+    "year": 2026
+  },
+  {
+    "date": "11/29",
+    "time": "13:55",
+    "stage": "MIZUHO BLUE CHALLENGE NADESHIKO 2026",
+    "team1": "日本",
+    "team2": "ブラジル",
+    "tv_onair": [
+      "日テレ"
+    ],
+    "tv_bs": [],
+    "tv_net": [
+      "TVer"
+    ],
+    "is_japan": true,
+    "score": null,
+    "team": "nadeshiko",
+    "year": 2026
+  },
+  {
+    "date": "12/5",
+    "time": "15:00",
+    "stage": "MIZUHO BLUE CHALLENGE NADESHIKO 2026",
+    "team1": "日本",
+    "team2": "ブラジル",
+    "tv_onair": [],
+    "tv_bs": [],
+    "tv_net": [],
+    "is_japan": true,
+    "score": null,
+    "team": "nadeshiko",
     "year": 2026
   },
   {
@@ -391,6 +750,7 @@
     "tv_net": [],
     "is_japan": true,
     "score": null,
+    "team": "a",
     "year": 2027
   },
   {
@@ -404,6 +764,7 @@
     "tv_net": [],
     "is_japan": true,
     "score": null,
+    "team": "a",
     "year": 2027
   },
   {
@@ -417,6 +778,7 @@
     "tv_net": [],
     "is_japan": true,
     "score": null,
+    "team": "a",
     "year": 2027
   }
 ]

@@ -17,7 +17,15 @@ from scraper import (
     parse_next_data_matches,
     convert_team_match,
     sort_matches,
+    parse_broadcast_tokens,
+    infer_year,
+    assign_years_sequential,
+    is_youth_stage,
+    parse_nadeshiko_page,
+    parse_youth_list_page,
+    dedupe_matches,
 )
+import datetime
 
 
 def test_normalize_broadcaster_maps_known_names():
@@ -262,8 +270,9 @@ def test_convert_team_match_fixture_without_score_or_round():
         "score": None, "status": "FIXTURE",
     }
     result = convert_team_match(raw)
+    # normalize_stage() により "AFC アジアカップ" は "AFCアジアカップ" に寄せられる
     assert result == {
-        "date": "1/11", "time": "23:00", "year": 2027, "stage": "AFC アジアカップ",
+        "date": "1/11", "time": "23:00", "year": 2027, "stage": "AFCアジアカップ",
         "team1": "日本", "team2": "インドネシア",
     }
 
@@ -284,3 +293,195 @@ def test_sort_matches_orders_within_same_year():
     matches = [_m("9/24", "19:35", 2026), _m("6/26", "08:00", 2026)]
     result = sort_matches(matches)
     assert [m["date"] for m in result] == ["6/26", "9/24"]
+
+
+# ---------------- なでしこ・若い世代の追加分 ----------------
+
+def test_parse_broadcast_tokens_splits_space_separated_names():
+    assert parse_broadcast_tokens("U-NEXT TBS系列 TVer") == ["U-NEXT", "TBS", "TVer"]
+
+
+def test_parse_broadcast_tokens_strips_markers_and_parentheses():
+    text = "【放送】TBS系列(録画) 【配信】 U-NEXT"
+    assert parse_broadcast_tokens(text) == ["TBS", "U-NEXT"]
+
+
+def test_parse_broadcast_tokens_skips_undetermined():
+    assert parse_broadcast_tokens("【放送】未定 【配信】未定") == []
+
+
+def test_parse_broadcast_tokens_dedupes():
+    assert parse_broadcast_tokens("DAZN(無料) DAZN") == ["DAZN"]
+
+
+def test_classify_new_net_broadcasters():
+    assert classify_broadcaster("U-NEXT") == "net"
+    assert classify_broadcaster("TVer") == "net"
+
+
+def test_normalize_broadcaster_handles_nittele_full_name():
+    assert normalize_broadcaster("日本テレビ系列") == "日テレ"
+
+
+TODAY = datetime.date(2026, 9, 23)
+
+
+def test_infer_year_future_date_is_this_year():
+    assert infer_year("10/10", TODAY) == 2026
+
+
+def test_infer_year_recent_past_is_this_year():
+    assert infer_year("9/21", TODAY) == 2026
+
+
+def test_infer_year_far_past_rolls_over_to_next_year():
+    assert infer_year("1/5", TODAY) == 2027
+
+
+def test_infer_year_across_new_year():
+    assert infer_year("1/2", datetime.date(2026, 12, 31)) == 2027
+    assert infer_year("12/30", datetime.date(2026, 12, 31)) == 2026
+
+
+def _entry(date):
+    return {"date": date, "time": "19:00", "stage": "S", "team1": "日本", "team2": "X"}
+
+
+def test_assign_years_sequential_keeps_past_matches_in_current_year():
+    entries = [_entry("3/4"), _entry("6/6"), _entry("9/25"), _entry("12/5")]
+    assign_years_sequential(entries, TODAY)
+    assert [e["year"] for e in entries] == [2026, 2026, 2026, 2026]
+
+
+def test_assign_years_sequential_rolls_over_at_year_boundary():
+    entries = [_entry("12/20"), _entry("1/15"), _entry("3/1")]
+    assign_years_sequential(entries, datetime.date(2026, 12, 18))
+    assert [e["year"] for e in entries] == [2026, 2027, 2027]
+
+
+def test_assign_years_sequential_handles_all_past_entries():
+    entries = [_entry("3/4"), _entry("6/6")]
+    assign_years_sequential(entries, TODAY)
+    assert [e["year"] for e in entries] == [2026, 2026]
+
+
+def test_is_youth_stage_excludes_a_team_competitions():
+    assert is_youth_stage("キリンチャレンジカップ2026") is False
+    assert is_youth_stage("ワールドカップ アジア最終予選") is False
+    assert is_youth_stage("AFCアジアカップ") is False
+
+
+def test_is_youth_stage_accepts_youth_and_women_competitions():
+    assert is_youth_stage("アジア大会男子第3節") is True
+    assert is_youth_stage("アジア大会女子準々決勝") is True
+    assert is_youth_stage("U-20女子ワールドカップ準決勝") is True
+    assert is_youth_stage("U-17ワールドカップ") is True
+    assert is_youth_stage("パリオリンピック") is True
+
+
+NADESHIKO_HTML = """
+<table>
+  <tr><th>試合日</th><th>大会</th><th>対戦カード</th><th>会場</th></tr>
+  <tr><td>3/4(水) 14:00</td><td>AFC女子アジアカップ2026 グループステージ第1節</td>
+      <td>日本 2-0 チャイニーズ・タイペイ</td><td>パース （オーストラリア）</td></tr>
+  <tr><td>9/25(金) 19:30</td><td>第20回アジア競技大会 準々決勝</td>
+      <td>日本 - フィリピン</td><td>エコパスタジアム （静岡）</td></tr>
+  <tr><td>11/29(日) 13:55</td><td>MIZUHO BLUE CHALLENGE NADESHIKO 2026</td>
+      <td>日本 - ブラジル</td><td>広島</td></tr>
+</table>
+<table>
+  <tr><th>試合日</th><th>対戦カード</th><th>放送・配信</th></tr>
+  <tr><td>9/25(金) 19:30</td><td>アジア競技大会 準々決勝 日本 vs フィリピン</td>
+      <td>【放送】TBS系列(録画) 【配信】 U-NEXT</td></tr>
+  <tr><td>11/29(日) 13:55</td><td>日本 vs ブラジル</td>
+      <td>【放送】日本テレビ系列 【配信】TVer</td></tr>
+</table>
+"""
+
+
+def test_parse_nadeshiko_page_merges_schedule_and_broadcast():
+    soup = BeautifulSoup(NADESHIKO_HTML, "html.parser")
+    matches = parse_nadeshiko_page(soup, TODAY)
+    assert len(matches) == 3
+    assert all(m["team"] == "nadeshiko" for m in matches)
+    assert [m["year"] for m in matches] == [2026, 2026, 2026]
+    qf = matches[1]
+    assert qf["tv_onair"] == ["TBS"]
+    assert qf["tv_net"] == ["U-NEXT"]
+    brazil = matches[2]
+    assert brazil["tv_onair"] == ["日テレ"]
+    assert brazil["tv_net"] == ["TVer"]
+
+
+YOUTH_HTML = """
+<h2>9月23日（水・祝）</h2>
+<table>
+  <tr><th>キックオフ</th><th>対戦カード</th><th>大会名</th><th>配信チャンネル</th></tr>
+  <tr><td>17:00</td><td>鹿島 vs 甲府</td><td>天皇杯3回戦</td><td>NHK BS</td></tr>
+  <tr><td>19:30</td><td>日本 vs タイ</td><td>アジア大会男子第3節</td><td>U-NEXT TBS系列 TVer</td></tr>
+  <tr><td>22:00</td><td>イタリア vs スペイン</td><td>U-20女子ワールドカップ準決勝</td><td>DAZN(無料)</td></tr>
+</table>
+<h3>この物語を楽しんでいただけましたか？</h3>
+<h2>9月24日（木）</h2>
+<table>
+  <tr><th>キックオフ</th><th>対戦カード</th><th>大会名</th><th>配信チャンネル</th></tr>
+  <tr><td>19:05</td><td>日本 vs ウルグアイ</td><td>キリンチャレンジカップ2026</td><td>フジテレビ系列 TVer</td></tr>
+  <tr><td>19:30</td><td>日本 vs フィリピン</td><td>アジア大会女子準々決勝</td><td>U-NEXT</td></tr>
+</table>
+"""
+
+
+def test_parse_youth_list_page_extracts_only_non_a_team_japan_matches():
+    soup = BeautifulSoup(YOUTH_HTML, "html.parser")
+    matches = parse_youth_list_page(soup, TODAY)
+    assert len(matches) == 2  # Jリーグ・他国同士・A代表(キリン)は除外
+    assert all(m["team"] == "youth" for m in matches)
+    first = matches[0]
+    assert (first["date"], first["time"], first["year"]) == ("9/23", "19:30", 2026)
+    assert first["stage"] == "アジア大会男子第3節"
+    assert first["team1"] == "日本" and first["team2"] == "タイ"
+    assert first["tv_onair"] == ["TBS"]
+    assert first["tv_net"] == ["U-NEXT", "TVer"]
+    assert matches[1]["stage"] == "アジア大会女子準々決勝"
+
+
+def test_parse_youth_list_page_ignores_tables_before_any_date_heading():
+    html = "<h2>U-NEXT</h2><table><tr><th>キックオフ</th><th>対戦カード</th>" \
+           "<th>大会名</th><th>配信</th></tr>" \
+           "<tr><td>19:30</td><td>日本 vs タイ</td><td>アジア大会男子</td><td>U-NEXT</td></tr></table>"
+    soup = BeautifulSoup(html, "html.parser")
+    assert parse_youth_list_page(soup, TODAY) == []
+
+
+def _team_match(team, date="9/25", time="19:30", year=2026):
+    return {"date": date, "time": time, "year": year, "stage": "S",
+            "team1": "日本", "team2": "フィリピン", "tv_onair": [], "tv_bs": [],
+            "tv_net": [], "is_japan": True, "score": None, "team": team}
+
+
+def test_dedupe_matches_prefers_higher_priority_team():
+    matches = [_team_match("youth"), _team_match("nadeshiko")]
+    result = dedupe_matches(matches)
+    assert len(result) == 1
+    assert result[0]["team"] == "nadeshiko"
+
+
+def test_dedupe_matches_keeps_different_date_times():
+    matches = [_team_match("nadeshiko"), _team_match("youth", time="21:00")]
+    assert len(dedupe_matches(matches)) == 2
+
+
+def test_merge_matches_sets_team_field():
+    schedule = [{"date": "9/25", "time": "19:30", "stage": "S",
+                 "team1": "日本", "team2": "X"}]
+    assert merge_matches(schedule, {})[0]["team"] == "a"
+    assert merge_matches(schedule, {}, team="youth")[0]["team"] == "youth"
+
+
+def test_detect_new_broadcasts_distinguishes_teams():
+    old = [dict(_team_match("a"), tv_onair=["NHK"])]
+    new = [dict(_team_match("a"), tv_onair=["NHK"]),
+           dict(_team_match("youth"), tv_onair=["TBS"])]
+    result = detect_new_broadcasts(old, new)
+    assert len(result) == 1
+    assert result[0]["team"] == "youth"
