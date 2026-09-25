@@ -15,35 +15,29 @@ FLAG_RED = (188, 0, 45)       # 日の丸の赤
 
 
 def generate():
-    img = Image.new("RGB", (SIZE, SIZE), BG_COLOR)
+    # 背景は白(日の丸の白地)、中央に大きな赤丸。「代表」は小さく、「TV」は大きく。
+    img = Image.new("RGB", (SIZE, SIZE), (255, 255, 255))
     draw = ImageDraw.Draw(img)
 
-    # 角丸っぽい縁取り(アクセントカラーの枠)
-    draw.rectangle([4, 4, SIZE - 5, SIZE - 5], outline=ACCENT_COLOR, width=6)
-
-    # 日の丸(中央、大きな赤丸)
-    sun_r = SIZE * 0.38
+    sun_r = SIZE * 0.42
     cx, cy = SIZE / 2, SIZE / 2
     draw.ellipse([cx - sun_r, cy - sun_r, cx + sun_r, cy + sun_r], fill=FLAG_RED)
 
     try:
-        font_large = ImageFont.truetype("meiryob.ttc", 64)
-        font_small = ImageFont.truetype("arialbd.ttf", 28)
+        font_small = ImageFont.truetype("meiryob.ttc", 54)
+        font_large = ImageFont.truetype("arialbd.ttf", 74)
     except OSError:
         font_large = ImageFont.load_default()
         font_small = ImageFont.load_default()
 
-    text1 = "代表"
-    bbox1 = draw.textbbox((0, 0), text1, font=font_large)
-    w1, h1 = bbox1[2] - bbox1[0], bbox1[3] - bbox1[1]
-    draw.text(((SIZE - w1) / 2 - bbox1[0], SIZE * 0.28 - h1 / 2 - bbox1[1]),
-              text1, font=font_large, fill=TEXT_COLOR)
+    def center_text(text, font, y_center):
+        bbox = draw.textbbox((0, 0), text, font=font)
+        w, h = bbox[2] - bbox[0], bbox[3] - bbox[1]
+        draw.text(((SIZE - w) / 2 - bbox[0], y_center - h / 2 - bbox[1]),
+                  text, font=font, fill=TEXT_COLOR)
 
-    text2 = "TV"
-    bbox2 = draw.textbbox((0, 0), text2, font=font_small)
-    w2, h2 = bbox2[2] - bbox2[0], bbox2[3] - bbox2[1]
-    draw.text(((SIZE - w2) / 2 - bbox2[0], SIZE * 0.68 - h2 / 2 - bbox2[1]),
-              text2, font=font_small, fill=TEXT_COLOR)
+    center_text("代表", font_small, SIZE * 0.36)
+    center_text("TV", font_large, SIZE * 0.66)
 
     img.save(OUTPUT, "PNG")
     print(f"アイコンを保存しました: {OUTPUT}")
