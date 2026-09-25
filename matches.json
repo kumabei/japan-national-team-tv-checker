@@ -38,7 +38,7 @@
     "time": "19:23",
     "stage": "ワールドカップ アジア最終予選 ワールドカップ予選AFC第2ラウンドグループ。 B",
     "team1": "日本",
-    "team2": "朝鮮民主主義人民共和国",
+    "team2": "北朝鮮",
     "tv_onair": [],
     "tv_bs": [],
     "tv_net": [],
@@ -54,7 +54,7 @@
     "date": "3/26",
     "time": "17:00",
     "stage": "ワールドカップ アジア最終予選 ワールドカップ予選AFC第2ラウンドグループ。 B",
-    "team1": "朝鮮民主主義人民共和国",
+    "team1": "北朝鮮",
     "team2": "日本",
     "tv_onair": [],
     "tv_bs": [],
@@ -643,7 +643,10 @@
       "TVer"
     ],
     "is_japan": true,
-    "score": null,
+    "score": {
+      "home": 3,
+      "away": 0
+    },
     "team": "youth",
     "year": 2026
   },
@@ -657,7 +660,10 @@
     "tv_bs": [],
     "tv_net": [],
     "is_japan": true,
-    "score": null,
+    "score": {
+      "home": 3,
+      "away": 1
+    },
     "team": "a",
     "year": 2026
   },
@@ -675,8 +681,77 @@
       "U-NEXT"
     ],
     "is_japan": true,
+    "score": {
+      "home": 4,
+      "away": 0
+    },
+    "team": "nadeshiko",
+    "year": 2026
+  },
+  {
+    "date": "9/26",
+    "time": "19:30",
+    "stage": "アジア大会男子準々決勝",
+    "team1": "日本",
+    "team2": "朝鮮民主主義人民共和国",
+    "tv_onair": [
+      "TBS"
+    ],
+    "tv_bs": [],
+    "tv_net": [
+      "U-NEXT",
+      "TVer"
+    ],
+    "is_japan": true,
+    "score": null,
+    "team": "youth",
+    "year": 2026
+  },
+  {
+    "date": "9/28",
+    "time": "19:25",
+    "stage": "親善試合",
+    "team1": "日本",
+    "team2": "ベネズエラ",
+    "tv_onair": [],
+    "tv_bs": [],
+    "tv_net": [],
+    "is_japan": true,
+    "score": null,
+    "team": "a",
+    "year": 2026
+  },
+  {
+    "date": "9/29",
+    "time": "19:30",
+    "stage": "第20回アジア競技大会 準決勝",
+    "team1": "日本",
+    "team2": "韓国",
+    "tv_onair": [
+      "TBS"
+    ],
+    "tv_bs": [],
+    "tv_net": [
+      "U-NEXT",
+      "TVer"
+    ],
+    "is_japan": true,
     "score": null,
     "team": "nadeshiko",
+    "year": 2026
+  },
+  {
+    "date": "10/1",
+    "time": "19:10",
+    "stage": "親善試合",
+    "team1": "日本",
+    "team2": "エクアドル",
+    "tv_onair": [],
+    "tv_bs": [],
+    "tv_net": [],
+    "is_japan": true,
+    "score": null,
+    "team": "a",
     "year": 2026
   },
   {
@@ -757,7 +832,7 @@
     "date": "1/16",
     "time": "23:00",
     "stage": "AFCアジアカップ アジアカップグループ。 F",
-    "team1": "タイ王国",
+    "team1": "タイ",
     "team2": "日本",
     "tv_onair": [],
     "tv_bs": [],
