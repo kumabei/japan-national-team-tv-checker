@@ -25,6 +25,8 @@ from scraper import (
     parse_youth_list_page,
     dedupe_matches,
     carry_over_finished,
+    parse_jfa_results,
+    apply_official_results,
 )
 import datetime
 
@@ -515,3 +517,31 @@ def test_carry_over_finished_does_not_keep_future_match():
 def test_carry_over_finished_skips_entry_without_year():
     old = [{"date": "9/23", "time": "19:30"}]
     assert carry_over_finished(old, [], today=datetime.date(2026, 9, 26)) == []
+
+
+def test_parse_jfa_results_reads_scores_and_skips_unplayed():
+    html = (
+        '<table><tr><td class="date poscenter">9/23(水・祝)</td><td class="comp_name">大会</td>'
+        '<td class="score poscenter"><a href="#">〇3-0</a></td><td class="team poscenter">タイ</td></tr>'
+        '<tr><td class="date poscenter">9/26(土)</td><td class="comp_name">大会</td>'
+        '<td class="score poscenter"></td><td class="team poscenter">北朝鮮</td></tr>'
+        '<tr><td class="date poscenter">9/28(月)</td><td class="comp_name">大会</td>'
+        '<td class="score poscenter">-</td><td class="team poscenter">ベネズエラ</td></tr>'
+        '<tr><td class="date poscenter">3/1(日)</td><td class="comp_name">大会</td>'
+        '<td class="score poscenter">△1-1(PK4-2)</td><td class="team poscenter">X</td></tr></table>'
+    )
+    assert parse_jfa_results(BeautifulSoup(html, "html.parser")) == {(9, 23): (3, 0), (3, 1): (1, 1)}
+
+
+def test_apply_official_results_fills_only_empty_past_scores_and_swaps_when_japan_is_team2():
+    today = datetime.date(2026, 9, 26)
+    results = {"a": {2026: {(9, 24): (3, 1), (9, 20): (2, 0)}}}
+    away_game = _finished_match(2026, "9/24", "19:35", team1="ウルグアイ", team2="日本", team="a")
+    home_game = _finished_match(2026, "9/20", "19:00", team="a")
+    has_score = _finished_match(2026, "9/20", "20:00", team="a", score={"home": 9, "away": 9})
+    future = _finished_match(2026, "9/28", "19:25", team="a")
+    apply_official_results([away_game, home_game, has_score, future], results, today=today)
+    assert away_game["score"] == {"home": 1, "away": 3}
+    assert home_game["score"] == {"home": 2, "away": 0}
+    assert has_score["score"] == {"home": 9, "away": 9}
+    assert future["score"] is None

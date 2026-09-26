@@ -505,6 +505,80 @@ def fetch_soup(url: str):
     return BeautifulSoup(res.text, "html.parser")
 
 
+JFA_RESULT_URLS = {
+    TEAM_A: "https://www.jfa.jp/samuraiblue/schedule_result/{year}.html",
+    TEAM_NADESHIKO: "https://www.jfa.jp/nadeshikojapan/schedule_result/{year}.html",
+    TEAM_YOUTH: "https://www.jfa.jp/national_team/u21/schedule_result/{year}.html",
+}
+
+
+def parse_jfa_results(soup) -> dict:
+    """JFA公式「スケジュール・結果」ページから {(月, 日): (日本の得点, 相手の得点)} を作る。
+
+    表の行は [日付, 大会, スコア, 対戦相手, 会場, PDF]。スコアは常に日本が先
+    （〇3-0／●0-1／△1-1 のように勝敗記号が付く）。未実施の試合はスコアが空か「-」。
+    PK戦などが括弧で続く場合は、先頭の90分（延長）スコアだけを取る。
+    """
+    results = {}
+    for row in soup.find_all("tr"):
+        date_cell = row.find("td", class_="date")
+        score_cell = row.find("td", class_="score")
+        if date_cell is None or score_cell is None:
+            continue
+        dm = re.match(r"^\s*(\d{1,2})/(\d{1,2})", date_cell.get_text(strip=True))
+        sm = re.search(r"(\d+)-(\d+)", score_cell.get_text(strip=True))
+        if not dm or not sm:
+            continue
+        results[(int(dm.group(1)), int(dm.group(2)))] = (int(sm.group(1)), int(sm.group(2)))
+    return results
+
+
+def apply_official_results(matches: list, results_by_team: dict, today=None) -> list:
+    """スコアが空の過去の試合に、JFA公式の結果を入れる（既にあるスコアは上書きしない）。
+
+    取得元ごとに「同じチームの同じ日」の結果は1つだけなので、日付で突き合わせる。
+    対戦相手の名前は取得元で表記が違う（北朝鮮／朝鮮民主主義人民共和国など）ため使わない。
+    JFAのスコアは日本が先なので、日本がteam2の試合ではhome/awayを入れ替える。
+    results_by_team は {チーム: {年: {(月, 日): (日本, 相手)}}}。
+    """
+    today = today or datetime.date.today()
+    filled = []
+    for m in matches:
+        if m.get("score") is not None or m.get("year") is None:
+            continue
+        month, day = (int(x) for x in m["date"].split("/"))
+        try:
+            if datetime.date(m["year"], month, day) >= today:
+                continue
+        except ValueError:
+            continue
+        found = results_by_team.get(m.get("team", TEAM_A), {}).get(m["year"], {}).get((month, day))
+        if found is None:
+            continue
+        japan, opponent = found
+        japan_is_home = any(n in m["team1"] for n in JAPAN_NAMES)
+        m["score"] = ({"home": japan, "away": opponent} if japan_is_home
+                      else {"home": opponent, "away": japan})
+        filled.append(m)
+    return filled
+
+
+def fetch_official_results(matches: list, today=None) -> dict:
+    """スコアが空の過去試合がある年だけ、JFA公式ページを取得する。失敗しても更新は続ける。"""
+    today = today or datetime.date.today()
+    years = {m["year"] for m in matches
+             if m.get("score") is None and m.get("year") and m["year"] <= today.year}
+    results = {}
+    for team, url_tmpl in JFA_RESULT_URLS.items():
+        for year in years:
+            url = url_tmpl.format(year=year)
+            try:
+                results.setdefault(team, {})[year] = parse_jfa_results(fetch_soup(url))
+            except Exception as e:  # ネットワーク・ページ構造の変化で全体を止めない
+                print(f"  警告: 公式結果を取得できませんでした（{url}）: {e}")
+    return results
+
+
 def sort_matches(matches: list) -> list:
     def key(m):
         month, day = m["date"].split("/")
@@ -594,6 +668,10 @@ def main() -> list:
     new_matches = sort_matches(
         dedupe_matches(fetched + carry_over_finished(old_matches, fetched))
     )
+
+    filled = apply_official_results(new_matches, fetch_official_results(new_matches))
+    for m in filled:
+        print(f"  公式結果を反映: {m['date']} {m['team1']} {m['score']['home']}-{m['score']['away']} {m['team2']}")
 
     new_broadcasts = detect_new_broadcasts(old_matches, new_matches)
 
