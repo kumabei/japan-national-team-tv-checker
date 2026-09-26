@@ -441,6 +441,32 @@ def dedupe_matches(matches: list) -> list:
     return [best[k] for k in order]
 
 
+def carry_over_finished(old_matches: list, new_matches: list, today=None) -> list:
+    """取得元の日程から消えた「終了済みの試合」を、既存データから引き継ぐ。
+
+    終了した試合は日程ページから落ちることがあり、そのままだとmatches.jsonからも
+    消えてしまう（9/23の日本×タイが消えた事故）。キーは（年・日付・時刻）で見る。
+    チーム名は取得元で表記が変わる（北朝鮮／朝鮮民主主義人民共和国など）ため使わない。
+    今日より前の試合だけを引き継ぐ。未来の試合は中止・日程変更で本当に
+    消えた可能性があるので、引き継がない。
+    """
+    today = today or datetime.date.today()
+    seen = {(m.get("year"), m["date"], m["time"]) for m in new_matches}
+    carried = []
+    for m in old_matches:
+        year = m.get("year")
+        if year is None or (year, m["date"], m["time"]) in seen:
+            continue
+        month, day = (int(x) for x in m["date"].split("/"))
+        try:
+            played_on = datetime.date(year, month, day)
+        except ValueError:
+            continue
+        if played_on < today:
+            carried.append(m)
+    return carried
+
+
 def _has_broadcast(match: dict) -> bool:
     return bool(match["tv_onair"] or match["tv_bs"] or match["tv_net"])
 
@@ -564,8 +590,9 @@ def main() -> list:
     youth_matches = fetch_youth_matches(old_matches=old_matches)
     print(f"  若い世代: {len(youth_matches)}試合")
 
+    fetched = a_matches + nadeshiko_matches + youth_matches
     new_matches = sort_matches(
-        dedupe_matches(a_matches + nadeshiko_matches + youth_matches)
+        dedupe_matches(fetched + carry_over_finished(old_matches, fetched))
     )
 
     new_broadcasts = detect_new_broadcasts(old_matches, new_matches)

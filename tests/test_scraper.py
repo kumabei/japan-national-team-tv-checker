@@ -24,6 +24,7 @@ from scraper import (
     parse_nadeshiko_page,
     parse_youth_list_page,
     dedupe_matches,
+    carry_over_finished,
 )
 import datetime
 
@@ -485,3 +486,32 @@ def test_detect_new_broadcasts_distinguishes_teams():
     result = detect_new_broadcasts(old, new)
     assert len(result) == 1
     assert result[0]["team"] == "youth"
+
+
+def _finished_match(year, date, time, team1="日本", team2="タイ", **kw):
+    d = {"year": year, "date": date, "time": time, "team1": team1, "team2": team2,
+         "tv_onair": [], "tv_bs": [], "tv_net": [], "score": None}
+    d.update(kw)
+    return d
+
+
+def test_carry_over_finished_keeps_past_match_dropped_from_source():
+    old = [_finished_match(2026, "9/23", "19:30", score={"home": 3, "away": 0})]
+    result = carry_over_finished(old, [], today=datetime.date(2026, 9, 26))
+    assert result == old
+
+
+def test_carry_over_finished_skips_match_still_in_new_data_even_if_team_name_differs():
+    old = [_finished_match(2024, "3/21", "19:23", team2="朝鮮民主主義人民共和国")]
+    new = [_finished_match(2024, "3/21", "19:23", team2="北朝鮮")]
+    assert carry_over_finished(old, new, today=datetime.date(2026, 9, 26)) == []
+
+
+def test_carry_over_finished_does_not_keep_future_match():
+    old = [_finished_match(2026, "10/1", "19:10", team2="エクアドル")]
+    assert carry_over_finished(old, [], today=datetime.date(2026, 9, 26)) == []
+
+
+def test_carry_over_finished_skips_entry_without_year():
+    old = [{"date": "9/23", "time": "19:30"}]
+    assert carry_over_finished(old, [], today=datetime.date(2026, 9, 26)) == []
