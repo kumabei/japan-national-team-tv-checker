@@ -27,6 +27,13 @@ from scraper import (
     carry_over_finished,
     parse_jfa_results,
     apply_official_results,
+    parse_broadcast_any,
+    parse_jfa_broadcast_text,
+    parse_jfa_schedule_links,
+    parse_jfa_about_page,
+    fill_broadcasts_from_jfa,
+    preserve_known_values,
+    find_suspicious_matches,
 )
 import datetime
 
@@ -545,3 +552,94 @@ def test_apply_official_results_fills_only_empty_past_scores_and_swaps_when_japa
     assert home_game["score"] == {"home": 2, "away": 0}
     assert has_score["score"] == {"home": 9, "away": 9}
     assert future["score"] is None
+
+
+def test_parse_broadcast_table_finds_table_by_header_even_when_an_extra_table_is_inserted():
+    # 実際に起きた構造: 日程表・アジアカップ日程表・放送表の3つ。位置決め打ちでは2つ目を読んでしまう
+    html = (
+        "<table><tr><th>試合日</th><th>大会</th><th>対戦カード</th><th>会場</th></tr>"
+        "<tr><td>9/24(木) 19:05</td><td>親善試合</td><td>日本 3-1 ウルグアイ</td><td>宮城</td></tr></table>"
+        "<table><tr><th>試合日</th><th>大会</th><th>対戦カード</th><th>会場</th></tr>"
+        "<tr><td>2027/1/11(月) 時間未定</td><td>アジアカップ</td><td>日本 - インドネシア</td><td>ジェッダ</td></tr></table>"
+        "<table><tr><th>試合日</th><th>対戦カード</th><th>放送・配信</th></tr>"
+        "<tr><td>9/28(月) 19:25</td><td>日本 - ベネズエラ</td><td>【放送】日本テレビ系列 【配信】TVer・DAZN</td></tr>"
+        "<tr><td>10/5(月) 19:30</td><td>日本 - 未定</td><td>【放送】テレビ朝日系列 【配信】TVer・ABEMA・DAZN</td></tr></table>"
+    )
+    result = parse_broadcast_table(BeautifulSoup(html, "html.parser"))
+    assert result[("9/28", "19:25")] == ["日テレ", "TVer", "DAZN"]
+    assert result[("10/5", "19:30")] == ["テレビ朝日", "TVer", "ABEMA", "DAZN"]
+
+
+def test_parse_broadcast_any_reads_both_old_and_new_formats():
+    assert parse_broadcast_any("【テレビ】NHK総合(19:00)") == ["NHK"]
+    assert parse_broadcast_any("【放送】TBS系列 【配信】TVer") == ["TBS", "TVer"]
+
+
+def test_parse_jfa_broadcast_text_keeps_only_known_names():
+    assert parse_jfa_broadcast_text("日本テレビ系全国ネット生中継／TVerライブ配信／DAZNライブ配信") == ["日テレ", "TVer", "DAZN"]
+    assert parse_jfa_broadcast_text("フジテレビ系列全国生中継／TVerライブ配信") == ["フジテレビ", "TVer"]
+    assert parse_jfa_broadcast_text("Youtube 「【公式】TBSスポーツ」にて生配信") == []
+
+
+_JFA_SINGLE = '<div><h5>テレビ放送</h5><p>日本テレビ系全国ネット生中継／TVerライブ配信</p></div>'
+_JFA_TOURNAMENT = (
+    '<table class="table03"><tr><th>対戦</th><th>キックオフ</th><th>開場</th><th>TV放送・配信</th></tr>'
+    '<tr><td>M1</td><td>パナマ代表　対　ニュージーランド代表</td><td>15:10</td><td>13:10</td><td>Youtube「【公式】TBSスポーツ」にて生配信</td></tr>'
+    '<tr><td>M2</td><td>SAMURAI BLUE（日本代表） 対　エクアドル代表</td><td>19:10</td><td>TBS系列<br>全国ネット生中継<br>TVerライブ配信</td></tr></table>'
+)
+
+
+def test_parse_jfa_about_page_handles_single_match_and_tournament_table():
+    assert parse_jfa_about_page(BeautifulSoup(_JFA_SINGLE, "html.parser")) == ["日テレ", "TVer"]
+    assert parse_jfa_about_page(BeautifulSoup(_JFA_TOURNAMENT, "html.parser"), "19:10") == ["TBS", "TVer"]
+    assert parse_jfa_about_page(BeautifulSoup(_JFA_TOURNAMENT, "html.parser"), "12:00") == []
+
+
+def test_parse_jfa_schedule_links_maps_date_to_first_link():
+    html = ('<table><tr><td class="date poscenter">9/28(月)</td><td><a href="/samuraiblue/20260928/">大会</a></td></tr>'
+            '<tr><td class="date poscenter">10/1(木)</td><td><a href="/samuraiblue/kirincupsoccer_2026/">大会</a></td></tr></table>')
+    assert parse_jfa_schedule_links(BeautifulSoup(html, "html.parser")) == {
+        (9, 28): "/samuraiblue/20260928/", (10, 1): "/samuraiblue/kirincupsoccer_2026/"}
+
+
+def test_fill_broadcasts_from_jfa_fills_only_empty_a_matches_and_survives_fetch_errors():
+    schedule = ('<table><tr><td class="date">9/28(月)</td><td><a href="/samuraiblue/20260928/">x</a></td></tr>'
+                '<tr><td class="date">10/1(木)</td><td><a href="/samuraiblue/kirincupsoccer_2026/">x</a></td></tr></table>')
+
+    def fake_fetch(url):
+        if url.endswith("2026.html"):
+            return BeautifulSoup(schedule, "html.parser")
+        if "20260928" in url:
+            return BeautifulSoup(_JFA_SINGLE, "html.parser")
+        raise RuntimeError("404")
+
+    empty = _finished_match(2026, "9/28", "19:25", team="a", team2="ベネズエラ")
+    has = _finished_match(2026, "9/28", "19:25", team="a", tv_onair=["TBS"])
+    failing = _finished_match(2026, "10/1", "19:10", team="a", team2="エクアドル")
+    other_team = _finished_match(2026, "9/28", "19:25", team="nadeshiko")
+    filled = fill_broadcasts_from_jfa([empty, has, failing, other_team],
+                                      today=datetime.date(2026, 9, 26), fetch=fake_fetch)
+    assert filled == [empty]
+    assert empty["tv_onair"] == ["日テレ"] and empty["tv_net"] == ["TVer"]
+    assert has["tv_onair"] == ["TBS"]
+    assert failing["tv_onair"] == [] and other_team["tv_onair"] == []
+
+
+def test_preserve_known_values_restores_lost_broadcast_and_score_but_not_changed_ones():
+    old = [_finished_match(2026, "9/24", "19:05", team="a", tv_onair=["フジテレビ"], score={"home": 3, "away": 1})]
+    new = [_finished_match(2026, "9/24", "19:05", team="a")]
+    restored = preserve_known_values(old, new)
+    assert new[0]["tv_onair"] == ["フジテレビ"] and new[0]["score"] == {"home": 3, "away": 1}
+    assert len(restored) == 2
+    changed = [_finished_match(2026, "9/24", "19:05", team="a", tv_onair=["TBS"])]
+    preserve_known_values(old, changed)
+    assert changed[0]["tv_onair"] == ["TBS"]  # 放送局が新しく取れている場合は旧値で上書きしない
+
+
+def test_find_suspicious_matches_flags_near_a_matches_without_broadcast():
+    today = datetime.date(2026, 9, 26)
+    near = _finished_match(2026, "9/28", "19:25", team="a")
+    far = _finished_match(2026, "11/14", "19:15", team="a")
+    covered = _finished_match(2026, "9/28", "19:25", team="a", tv_onair=["日テレ"])
+    nadeshiko = _finished_match(2026, "9/29", "19:00", team="nadeshiko")
+    assert find_suspicious_matches([near, far, covered, nadeshiko], today=today) == [near]

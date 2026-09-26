@@ -396,7 +396,9 @@
     "stage": "親善試合",
     "team1": "イングランド",
     "team2": "日本",
-    "tv_onair": [],
+    "tv_onair": [
+      "NHK"
+    ],
     "tv_bs": [],
     "tv_net": [],
     "is_japan": true,
@@ -464,9 +466,13 @@
     "stage": "親善試合",
     "team1": "日本",
     "team2": "アイスランド",
-    "tv_onair": [],
+    "tv_onair": [
+      "日テレ"
+    ],
     "tv_bs": [],
-    "tv_net": [],
+    "tv_net": [
+      "TVer"
+    ],
     "is_japan": true,
     "score": {
       "home": 1,
@@ -656,9 +662,13 @@
     "stage": "親善試合",
     "team1": "日本",
     "team2": "ウルグアイ",
-    "tv_onair": [],
+    "tv_onair": [
+      "フジテレビ"
+    ],
     "tv_bs": [],
-    "tv_net": [],
+    "tv_net": [
+      "TVer"
+    ],
     "is_japan": true,
     "score": {
       "home": 3,
@@ -713,9 +723,14 @@
     "stage": "親善試合",
     "team1": "日本",
     "team2": "ベネズエラ",
-    "tv_onair": [],
+    "tv_onair": [
+      "日テレ"
+    ],
     "tv_bs": [],
-    "tv_net": [],
+    "tv_net": [
+      "TVer",
+      "DAZN"
+    ],
     "is_japan": true,
     "score": null,
     "team": "a",
@@ -746,9 +761,13 @@
     "stage": "親善試合",
     "team1": "日本",
     "team2": "エクアドル",
-    "tv_onair": [],
+    "tv_onair": [
+      "TBS"
+    ],
     "tv_bs": [],
-    "tv_net": [],
+    "tv_net": [
+      "TVer"
+    ],
     "is_japan": true,
     "score": null,
     "team": "a",

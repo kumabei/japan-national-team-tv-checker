@@ -49,6 +49,10 @@ BROADCASTER_MAP = {
     "テレビ東京": "テレビ東京",
     "テレ東": "テレビ東京",
     "日本テレビ系列": "日テレ",
+    "日本テレビ系": "日テレ",
+    "フジテレビ系": "フジテレビ",
+    "TBS系": "TBS",
+    "テレビ朝日系": "テレビ朝日",
     "テレビ朝日系列": "テレビ朝日",
     "テレビ東京系列": "テレビ東京",
     "NHK総合テレビ": "NHK",
@@ -175,6 +179,7 @@ def parse_broadcast_tokens(text: str) -> list:
     """
     text = re.sub(r"【[^】]*】", " ", text)
     text = re.sub(r"[(（][^)）]*[)）]", " ", text)
+    text = text.replace("・", " ")  # 「TVer・DAZN」のように1語にまとまるのを防ぐ
     broadcasters = []
     for token in text.split():
         token = token.strip("、,・/／")
@@ -258,24 +263,50 @@ def parse_schedule_table(soup) -> list:
     return results
 
 
-def parse_broadcast_table(soup, text_parser=None) -> dict:
-    text_parser = text_parser or parse_broadcast_text
+def parse_broadcast_any(text: str) -> list:
+    """A代表の放送欄を読む。従来の `【テレビ】局名(時刻)` 形式を先に試し、
+    読めなければ現行の `【放送】日本テレビ系列 【配信】TVer・DAZN` 形式を読む。"""
+    return parse_broadcast_text(text) or parse_broadcast_tokens(text)
+
+
+def find_broadcast_table(soup):
+    """ヘッダーに「放送」を含む表を探す。無ければ従来どおりの位置決め打ちにする。
+
+    goal.comの記事は、日程表の後ろに別の表（アジアカップ日程など）が挿入されて
+    表の順番がずれることがあり、位置決め打ち(tables[1])では別の表を読んで
+    放送局が1つも取れなくなっていた。
+    """
     tables = soup.find_all("table")
-    if len(tables) == 0:
+    for table in tables:
+        header = table.find("tr")
+        if header is None:
+            continue
+        cells = [c.get_text(" ", strip=True) for c in header.find_all(["td", "th"])]
+        if any("放送" in c for c in cells):
+            return table
+    if not tables:
+        return None
+    return tables[1] if len(tables) >= 2 else tables[0]
+
+
+def parse_broadcast_table(soup, text_parser=None) -> dict:
+    text_parser = text_parser or parse_broadcast_any
+    table = find_broadcast_table(soup)
+    if table is None:
         return {}
-    # Use the second table if it exists (schedule + broadcast on same page),
-    # otherwise use the first table (broadcast-only page)
-    table = tables[1] if len(tables) >= 2 else tables[0]
     rows = table.find_all("tr")
+    header = [c.get_text(" ", strip=True) for c in rows[0].find_all(["td", "th"])] if rows else []
+    # 放送欄の列は見出しで探す。見つからなければ従来どおり3列目
+    col = next((i for i, c in enumerate(header) if "放送" in c), 2)
     result = {}
     for row in rows[1:]:
         cells = [c.get_text(" ", strip=True) for c in row.find_all(["td", "th"])]
-        if len(cells) < 3:
+        if len(cells) <= col:
             continue
         date_time = parse_date_time(cells[0])
         if date_time is None:
             continue
-        result[date_time] = text_parser(cells[2])
+        result[date_time] = text_parser(cells[col])
     return result
 
 
@@ -579,6 +610,153 @@ def fetch_official_results(matches: list, today=None) -> dict:
     return results
 
 
+JFA_A_SCHEDULE_URL = JFA_RESULT_URLS[TEAM_A]
+JFA_BASE = "https://www.jfa.jp"
+_JFA_STRIP_RE = re.compile(r"(全国ネット生中継|全国生中継|生中継|ライブ配信)")
+_KNOWN_BROADCASTERS = TERRESTRIAL_BROADCASTERS | BS_BROADCASTERS | NET_BROADCASTERS
+
+
+def parse_jfa_broadcast_text(text: str) -> list:
+    """JFAの放送欄（「日本テレビ系全国ネット生中継／TVerライブ配信」など）から局名を取り出す。
+
+    知っている局名だけを採用する。YouTube配信の説明文などを、未知の名前のまま
+    地上波として扱ってしまう（classify_broadcasterは未知の名前をonair扱いにする）のを防ぐ。
+    """
+    broadcasters = []
+    for token in re.split(r"[／/\s|]+", text):
+        name = normalize_broadcaster(_JFA_STRIP_RE.sub("", token).strip())
+        if name in _KNOWN_BROADCASTERS and name not in broadcasters:
+            broadcasters.append(name)
+    return broadcasters
+
+
+def parse_jfa_schedule_links(soup) -> dict:
+    """JFAのA代表日程ページから {(月, 日): 試合ページのパス} を作る。"""
+    links = {}
+    for row in soup.find_all("tr"):
+        date_cell = row.find("td", class_="date")
+        link = row.find("a", href=True)
+        if date_cell is None or link is None:
+            continue
+        dm = re.match(r"^\s*(\d{1,2})/(\d{1,2})", date_cell.get_text(strip=True))
+        if dm:
+            links.setdefault((int(dm.group(1)), int(dm.group(2))), link["href"])
+    return links
+
+
+def parse_jfa_about_page(soup, time_str: str = None) -> list:
+    """試合の「大会概要(about.html)」ページから、日本代表戦の放送局を読む。
+
+    形は2種類ある。(1) 単独試合：見出し「テレビ放送」の直後の段落。
+    (2) キリンカップのような複数試合の大会：表(table03)の行。日本代表の行のうち
+    キックオフ時刻が一致するものの最後のセルを読む。
+    """
+    for h in soup.find_all("h5"):
+        if h.get_text(strip=True) == "テレビ放送":
+            nxt = h.find_next_sibling()
+            if nxt is not None:
+                return parse_jfa_broadcast_text(nxt.get_text(" ", strip=True))
+    for table in soup.find_all("table", class_="table03"):
+        for row in table.find_all("tr"):
+            cells = [c.get_text(" ", strip=True) for c in row.find_all(["td", "th"])]
+            text = " ".join(cells)
+            if not ("SAMURAI BLUE" in text or "日本代表" in text):
+                continue
+            if time_str and time_str not in cells:
+                continue
+            return parse_jfa_broadcast_text(cells[-1])
+    return []
+
+
+def fill_broadcasts_from_jfa(matches: list, today=None, fetch=None) -> list:
+    """放送局が空のA代表戦に、JFA公式の放送情報を入れる（既にある放送局は上書きしない）。
+
+    goal.comは終了後の試合の放送行を落とすうえ、ページ構造が変わると放送局が
+    1つも取れなくなる。JFAは主催者の公式情報なので、第2の取得元として使う。
+    失敗しても更新は止めない。
+    """
+    fetch = fetch or fetch_soup
+    today = today or datetime.date.today()
+    targets = [m for m in matches
+               if m.get("team", TEAM_A) == TEAM_A and m.get("year") == today.year
+               and not _has_broadcast(m)]
+    if not targets:
+        return []
+    filled = []
+    try:
+        links = parse_jfa_schedule_links(fetch(JFA_A_SCHEDULE_URL.format(year=today.year)))
+    except Exception as e:
+        print(f"  警告: JFAの日程ページを取得できませんでした: {e}")
+        return []
+    pages = {}  # 同じ大会ページを試合ごとに取り直さないためのキャッシュ（失敗もNoneで記憶）
+    for m in targets:
+        month, day = (int(x) for x in m["date"].split("/"))
+        path = links.get((month, day))
+        if not path:
+            continue
+        url = JFA_BASE + path.rstrip("/") + "/about.html"
+        if url not in pages:
+            try:
+                pages[url] = fetch(url)
+            except Exception as e:  # 404（試合ページ未公開・大会ページに概要が無い）など
+                print(f"  警告: JFAの試合ページを取得できませんでした（{url}）: {e}")
+                pages[url] = None
+        if pages[url] is None:
+            continue
+        names = parse_jfa_about_page(pages[url], m["time"])
+        if not names:
+            continue
+        m["tv_onair"] = [n for n in names if classify_broadcaster(n) == "onair"]
+        m["tv_bs"] = [n for n in names if classify_broadcaster(n) == "bs"]
+        m["tv_net"] = [n for n in names if classify_broadcaster(n) == "net"]
+        filled.append(m)
+    return filled
+
+
+def preserve_known_values(old_matches: list, new_matches: list) -> list:
+    """更新で値が悪化した試合に、既存データの値を戻す。
+
+    放送局が「あった→空」、スコアが「あった→空」になる更新は、取得元の不調や
+    構造変化による取りこぼしとみなして旧値を保つ。キーは（年・日付・時刻・チーム区分）。
+    戻した内容を文字列のリストで返す（警告表示用）。
+    """
+    old_by_key = {(m.get("year"), m["date"], m["time"], m.get("team", TEAM_A)): m
+                  for m in old_matches}
+    restored = []
+    for m in new_matches:
+        old = old_by_key.get((m.get("year"), m["date"], m["time"], m.get("team", TEAM_A)))
+        if old is None:
+            continue
+        if _has_broadcast(old) and not _has_broadcast(m):
+            m["tv_onair"], m["tv_bs"], m["tv_net"] = old["tv_onair"], old["tv_bs"], old["tv_net"]
+            restored.append(f"{m['date']} {m['team2']}: 放送局")
+        if old.get("score") is not None and m.get("score") is None:
+            m["score"] = old["score"]
+            restored.append(f"{m['date']} {m['team2']}: スコア")
+    return restored
+
+
+def find_suspicious_matches(matches: list, today=None, days: int = 7) -> list:
+    """A代表戦で、放送局が空のままの試合（前後 days 日以内）を返す。
+
+    「本当に未定」なのか「取れていない」のかはデータからは区別できないため、
+    どちらの可能性もあるものとして人が確認できるよう挙げる。
+    """
+    today = today or datetime.date.today()
+    found = []
+    for m in matches:
+        if m.get("team", TEAM_A) != TEAM_A or m.get("year") is None or _has_broadcast(m):
+            continue
+        month, day = (int(x) for x in m["date"].split("/"))
+        try:
+            delta = (datetime.date(m["year"], month, day) - today).days
+        except ValueError:
+            continue
+        if -3 <= delta <= days:
+            found.append(m)
+    return found
+
+
 def sort_matches(matches: list) -> list:
     def key(m):
         month, day = m["date"].split("/")
@@ -646,15 +824,20 @@ def print_new_broadcasts(new_broadcasts: list):
 
 def main() -> list:
     old_matches = load_old_matches()
+    problems = []  # 要確認の内容。最後にまとめて出す
 
     print(f"取得中: {TEAM_SCHEDULE_URL}")
     schedule = fetch_team_matches(TEAM_SCHEDULE_URL)
+    if not schedule:
+        problems.append("A代表の日程を取得できませんでした（取得元の構造変化の可能性）")
 
     print(f"取得中: {URL}")
     soup = fetch_soup(URL)
     broadcasts = parse_broadcast_table(soup)
+    if not broadcasts:
+        problems.append("goal.comの放送表から放送局を取得できませんでした（表の構造変化の可能性）")
     a_matches = merge_matches(schedule, broadcasts, team=TEAM_A, old_matches=old_matches)
-    print(f"  A代表: {len(a_matches)}試合")
+    print(f"  A代表: {len(a_matches)}試合（放送表 {len(broadcasts)}行）")
 
     print(f"取得中: {NADESHIKO_URL}")
     nadeshiko_matches = fetch_nadeshiko_matches(old_matches=old_matches)
@@ -673,13 +856,31 @@ def main() -> list:
     for m in filled:
         print(f"  公式結果を反映: {m['date']} {m['team1']} {m['score']['home']}-{m['score']['away']} {m['team2']}")
 
+    for m in fill_broadcasts_from_jfa(new_matches):
+        names = m["tv_onair"] + m["tv_bs"] + m["tv_net"]
+        print(f"  JFA公式の放送局を反映: {m['date']} {m['team2']} → {'・'.join(names)}")
+
+    for what in preserve_known_values(old_matches, new_matches):
+        print(f"  旧データを保持（今回の取得では欠けていた）: {what}")
+
     new_broadcasts = detect_new_broadcasts(old_matches, new_matches)
 
     save_matches(new_matches)
     print(f"{OUTPUT_FILE} を更新しました（{len(new_matches)}試合）")
     print_new_broadcasts(new_broadcasts)
+
+    for m in find_suspicious_matches(new_matches):
+        problems.append(f"{m['year']}/{m['date']} {m['team1']} 対 {m['team2']} の放送局が空です"
+                        "（本当に未定か、取れていないかを確認）")
+    if problems:
+        print("\n===== 要確認 =====")
+        for pr in problems:
+            print(f"  要確認: {pr}")
+    main.problems = problems
     return new_broadcasts
 
 
 if __name__ == "__main__":
     main()
+    # 日程・放送表が取れないなど「取得元が壊れている」場合は終了コードで知らせる
+    sys.exit(1 if any("取得できませんでした" in p for p in getattr(main, "problems", [])) else 0)
