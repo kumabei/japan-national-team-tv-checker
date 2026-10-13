@@ -1,0 +1,73 @@
+# 放送予定・試合結果を毎日2回取り直して matches.json を更新する。
+# 成功するたびに last_checked.json へ確認時刻を書き、画面の「最終確認」に出す
+# （止まっていれば日付が古いまま残るので、アプリを開けば気づける）。
+# 毎回commitが入るため、公開リポジトリの「60日間動きがないと定期実行が止まる」も防げる。
+
+name: 放送予定の更新
+
+on:
+  schedule:
+    # 毎時0分は混雑で遅延・取りこぼしがあるため17分にずらす（時刻はUTC）
+    - cron: "17 21 * * *"  # 日本時間 6:17（夜中の海外の試合の結果を拾う）
+    - cron: "17 8 * * *"   # 日本時間 17:17（当日決まった夜の試合の放送局を拾う）
+  workflow_dispatch:
+    inputs:
+      fail_test:
+        description: "失敗通知の確認用に、わざと失敗させる"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: update-matches
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      # scraper.py は date.today() で「終わった試合か」を判定するので日本時間にそろえる
+      TZ: Asia/Tokyo
+      PYTHONIOENCODING: utf-8
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - run: pip install -r requirements.txt
+
+      - name: 失敗通知の確認（手動実行で指定したときだけ）
+        if: ${{ inputs.fail_test }}
+        run: |
+          echo "失敗通知の確認のため、わざと失敗させます"
+          exit 1
+
+      - name: scraper を実行
+        run: python scraper.py
+
+      - name: 確認時刻を記録
+        run: |
+          printf '{"checked_at": "%s"}\n' "$(date '+%Y-%m-%dT%H:%M:%S%:z')" > last_checked.json
+
+      - name: commit して push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add matches.json last_checked.json
+          if git diff --cached --quiet -- matches.json; then
+            msg="定期更新: 確認時刻のみ（試合データの変化なし）"
+          else
+            msg="定期更新: matches.json を更新"
+          fi
+          git commit -q -m "$msg"
+          for _ in 1 2 3; do
+            git pull --rebase -q && git push -q && exit 0
+            sleep 10
+          done
+          exit 1

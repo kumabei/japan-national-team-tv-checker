@@ -59,6 +59,9 @@ header{
 }
 .title-row h1 span{color:var(--accent);}
 .clock{font-family:ui-monospace,'SF Mono',Menlo,monospace;font-size:12px;color:var(--muted);}
+.checked{font-size:11px;color:var(--muted);margin:-6px 0 8px;}
+.checked.stale{color:var(--jp);font-weight:700;}
+.checked.hidden{display:none;}
 
 .filters{
   display:flex;gap:6px;overflow-x:auto;
@@ -284,6 +287,7 @@ body.light .scrolltop{background:var(--accent);color:#FFFFFF;}
       <button class="theme-btn" id="themeBtn" title="ライト／ダーク切替">🌙</button>
     </div>
   </div>
+  <div class="checked hidden" id="checked"></div>
   <div class="filters" id="filters">
     <div class="chip" data-filter="date">日付</div>
     <div class="chip" data-filter="onair">地上波あり</div>
@@ -934,12 +938,33 @@ async function loadMatches() {
   }
 }
 
+// 最終確認時刻（GitHub Actions が取り直すたびに last_checked.json を更新する）。
+// 1日2回動くので、24時間を超えて古ければ止まっている印として赤で出す
+async function loadChecked() {
+  const el = document.getElementById("checked");
+  try {
+    const res = await fetch("last_checked.json?" + Date.now());
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const t = new Date((await res.json()).checked_at);
+    if (isNaN(t)) throw new Error("invalid checked_at");
+    const pad = n => String(n).padStart(2, "0");
+    const label = `最終確認 ${t.getMonth() + 1}/${t.getDate()} ${pad(t.getHours())}:${pad(t.getMinutes())}`;
+    const stale = Date.now() - t.getTime() > 24 * 60 * 60 * 1000;
+    el.textContent = stale ? `${label}（更新が止まっています）` : label;
+    el.classList.toggle("stale", stale);
+    el.classList.remove("hidden");
+  } catch (e) {
+    console.info("last_checked.json を読めませんでした:", e.message);
+  }
+}
+
 // 時計スタート
 tickClock();
 setInterval(tickClock, 30000);
 
 // データ読み込み開始
 loadMatches();
+loadChecked();
 </script>
 </body>
 </html>
