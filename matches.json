@@ -713,7 +713,10 @@
       "TVer"
     ],
     "is_japan": true,
-    "score": null,
+    "score": {
+      "home": 1,
+      "away": 0
+    },
     "team": "youth",
     "year": 2026
   },
@@ -732,7 +735,10 @@
       "DAZN"
     ],
     "is_japan": true,
-    "score": null,
+    "score": {
+      "home": 2,
+      "away": 1
+    },
     "team": "a",
     "year": 2026
   },
@@ -751,7 +757,10 @@
       "TVer"
     ],
     "is_japan": true,
-    "score": null,
+    "score": {
+      "home": 2,
+      "away": 0
+    },
     "team": "nadeshiko",
     "year": 2026
   },
@@ -769,7 +778,33 @@
       "TVer"
     ],
     "is_japan": true,
-    "score": null,
+    "score": {
+      "home": 0,
+      "away": 0
+    },
+    "team": "a",
+    "year": 2026
+  },
+  {
+    "date": "10/5",
+    "time": "19:30",
+    "stage": "親善試合",
+    "team1": "日本",
+    "team2": "ニュージーランド",
+    "tv_onair": [
+      "テレビ朝日"
+    ],
+    "tv_bs": [],
+    "tv_net": [
+      "TVer",
+      "ABEMA",
+      "DAZN"
+    ],
+    "is_japan": true,
+    "score": {
+      "home": 2,
+      "away": 1
+    },
     "team": "a",
     "year": 2026
   },
@@ -783,7 +818,10 @@
     "tv_bs": [],
     "tv_net": [],
     "is_japan": true,
-    "score": null,
+    "score": {
+      "home": 5,
+      "away": 1
+    },
     "team": "nadeshiko",
     "year": 2026
   },
@@ -793,12 +831,32 @@
     "stage": "国際親善試合",
     "team1": "日本",
     "team2": "ドイツ",
-    "tv_onair": [],
+    "tv_onair": [
+      "NHK"
+    ],
     "tv_bs": [],
-    "tv_net": [],
+    "tv_net": [
+      "ABEMA"
+    ],
     "is_japan": true,
     "score": null,
     "team": "nadeshiko",
+    "year": 2026
+  },
+  {
+    "date": "10/19",
+    "time": "00:00",
+    "stage": "U-17女子W杯 第1節",
+    "team1": "日本",
+    "team2": "ザンビア",
+    "tv_onair": [],
+    "tv_bs": [],
+    "tv_net": [
+      "DAZN"
+    ],
+    "is_japan": true,
+    "score": null,
+    "team": "youth",
     "year": 2026
   },
   {
