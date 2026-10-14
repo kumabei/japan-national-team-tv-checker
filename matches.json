@@ -839,7 +839,10 @@
       "ABEMA"
     ],
     "is_japan": true,
-    "score": null,
+    "score": {
+      "home": 1,
+      "away": 2
+    },
     "team": "nadeshiko",
     "year": 2026
   },
