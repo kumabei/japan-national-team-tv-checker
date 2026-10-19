@@ -879,6 +879,22 @@
     "year": 2026
   },
   {
+    "date": "10/25",
+    "time": "03:00",
+    "stage": "U-17女子W杯第3節",
+    "team1": "ベネズエラ",
+    "team2": "日本",
+    "tv_onair": [],
+    "tv_bs": [],
+    "tv_net": [
+      "DAZN"
+    ],
+    "is_japan": true,
+    "score": null,
+    "team": "youth",
+    "year": 2026
+  },
+  {
     "date": "11/29",
     "time": "13:55",
     "stage": "MIZUHO BLUE CHALLENGE NADESHIKO 2026",
