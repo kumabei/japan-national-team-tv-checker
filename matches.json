@@ -947,6 +947,23 @@
       "DAZN"
     ],
     "is_japan": true,
+    "score": {
+      "home": 0,
+      "away": 2
+    },
+    "team": "youth",
+    "year": 2026
+  },
+  {
+    "date": "10/30",
+    "time": "03:00",
+    "stage": "U-17女子W杯 16強",
+    "team1": "日本",
+    "team2": "未定",
+    "tv_onair": [],
+    "tv_bs": [],
+    "tv_net": [],
+    "is_japan": true,
     "score": null,
     "team": "youth",
     "year": 2026
@@ -1007,6 +1024,48 @@
     "time": "01:00",
     "stage": "U-21代表親善試合",
     "team1": "エジプト",
+    "team2": "日本",
+    "tv_onair": [],
+    "tv_bs": [],
+    "tv_net": [],
+    "is_japan": true,
+    "score": null,
+    "team": "youth",
+    "year": 2026
+  },
+  {
+    "date": "11/21",
+    "time": "21:30",
+    "stage": "U-17W杯 1st ステージ",
+    "team1": "日本",
+    "team2": "コロンビア",
+    "tv_onair": [],
+    "tv_bs": [],
+    "tv_net": [],
+    "is_japan": true,
+    "score": null,
+    "team": "youth",
+    "year": 2026
+  },
+  {
+    "date": "11/24",
+    "time": "22:00",
+    "stage": "U-17W杯 1st ステージ",
+    "team1": "日本",
+    "team2": "セルビア",
+    "tv_onair": [],
+    "tv_bs": [],
+    "tv_net": [],
+    "is_japan": true,
+    "score": null,
+    "team": "youth",
+    "year": 2026
+  },
+  {
+    "date": "11/27",
+    "time": "22:00",
+    "stage": "U-17W杯 1st ステージ",
+    "team1": "ホンジュラス",
     "team2": "日本",
     "tv_onair": [],
     "tv_bs": [],
