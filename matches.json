@@ -765,6 +765,23 @@
     "year": 2026
   },
   {
+    "date": "9/30",
+    "time": "19:30",
+    "stage": "U-21 アジア大会 準決勝",
+    "team1": "ウズベキスタン",
+    "team2": "日本",
+    "tv_onair": [],
+    "tv_bs": [],
+    "tv_net": [],
+    "is_japan": true,
+    "score": {
+      "home": 1,
+      "away": 1
+    },
+    "team": "youth",
+    "year": 2026
+  },
+  {
     "date": "10/1",
     "time": "19:10",
     "stage": "親善試合",
@@ -783,6 +800,40 @@
       "away": 0
     },
     "team": "a",
+    "year": 2026
+  },
+  {
+    "date": "10/2",
+    "time": "19:30",
+    "stage": "女子アジア大会 決勝",
+    "team1": "北朝鮮",
+    "team2": "日本",
+    "tv_onair": [],
+    "tv_bs": [],
+    "tv_net": [],
+    "is_japan": true,
+    "score": {
+      "home": 2,
+      "away": 2
+    },
+    "team": "nadeshiko",
+    "year": 2026
+  },
+  {
+    "date": "10/3",
+    "time": "19:30",
+    "stage": "U-21 アジア大会 決勝",
+    "team1": "韓国",
+    "team2": "日本",
+    "tv_onair": [],
+    "tv_bs": [],
+    "tv_net": [],
+    "is_japan": true,
+    "score": {
+      "home": 1,
+      "away": 0
+    },
+    "team": "youth",
     "year": 2026
   },
   {
@@ -858,7 +909,10 @@
       "DAZN"
     ],
     "is_japan": true,
-    "score": null,
+    "score": {
+      "home": 5,
+      "away": 0
+    },
     "team": "youth",
     "year": 2026
   },
@@ -874,7 +928,10 @@
       "DAZN"
     ],
     "is_japan": true,
-    "score": null,
+    "score": {
+      "home": 2,
+      "away": 0
+    },
     "team": "youth",
     "year": 2026
   },
@@ -889,6 +946,71 @@
     "tv_net": [
       "DAZN"
     ],
+    "is_japan": true,
+    "score": null,
+    "team": "youth",
+    "year": 2026
+  },
+  {
+    "date": "11/14",
+    "time": "03:00",
+    "stage": "U-21代表親善試合",
+    "team1": "スペイン",
+    "team2": "日本",
+    "tv_onair": [],
+    "tv_bs": [],
+    "tv_net": [],
+    "is_japan": true,
+    "score": null,
+    "team": "youth",
+    "year": 2026
+  },
+  {
+    "date": "11/14",
+    "time": "19:15",
+    "stage": "代表親善試合",
+    "team1": "日本",
+    "team2": "ブラジル",
+    "tv_onair": [
+      "テレビ朝日"
+    ],
+    "tv_bs": [],
+    "tv_net": [
+      "U-NEXT"
+    ],
+    "is_japan": true,
+    "score": null,
+    "team": "a",
+    "year": 2026
+  },
+  {
+    "date": "11/17",
+    "time": "22:10",
+    "stage": "代表親善試合",
+    "team1": "日本",
+    "team2": "パラグアイ",
+    "tv_onair": [
+      "日テレ"
+    ],
+    "tv_bs": [],
+    "tv_net": [
+      "TVer",
+      "U-NEXT"
+    ],
+    "is_japan": true,
+    "score": null,
+    "team": "a",
+    "year": 2026
+  },
+  {
+    "date": "11/18",
+    "time": "01:00",
+    "stage": "U-21代表親善試合",
+    "team1": "エジプト",
+    "team2": "日本",
+    "tv_onair": [],
+    "tv_bs": [],
+    "tv_net": [],
     "is_japan": true,
     "score": null,
     "team": "youth",
