@@ -40,6 +40,7 @@ from scraper import (
     add_missing_matches,
     results_from_matches,
     find_score_conflicts,
+    parse_fifa_matches,
 )
 import datetime
 
@@ -747,3 +748,30 @@ def test_results_from_matches_and_score_conflicts_compare_from_japans_side():
     wrong = _finished_match(2026, "9/24", "19:05", team2="ウルグアイ", team="a", score={"home": 1, "away": 3})
     assert find_score_conflicts([same], results, "スポーツナビ") == []
     assert len(find_score_conflicts([wrong], results, "スポーツナビ")) == 1
+
+
+def _fifa(date, home, away, home_score=None, away_score=None, status=1, stage="グループステージの試合"):
+    def side(name, score):
+        if name is None:
+            return None
+        return {"IdCountry": "JPN" if name == "日本" else "XXX",
+                "TeamName": [{"Description": name}], "Score": score}
+    return {"Date": date, "StageName": [{"Description": stage}], "MatchStatus": status,
+            "Home": side(home, home_score), "Away": side(away, away_score)}
+
+
+def test_parse_fifa_matches_converts_to_jst_and_reads_only_finished_scores():
+    results = [
+        _fifa("2026-10-24T18:00:00Z", "ベネズエラ", "日本", 0, 2, status=0),
+        _fifa("2026-10-29T18:00:00Z", "日本", None, stage="16強"),
+        _fifa("2026-10-25T18:00:00Z", "ザンビア", "フランス", 1, 1, status=0),
+        _fifa("2026-10-26T18:00:00Z", "日本", "X", 1, 0, status=3),
+    ]
+    entries = parse_fifa_matches(results, "U-17女子W杯")
+    assert entries[0] == {"date": "10/25", "time": "03:00", "year": 2026,
+                          "stage": "U-17女子W杯 グループステージの試合",
+                          "team1": "ベネズエラ", "team2": "日本", "score1": 0, "score2": 2}
+    assert entries[1]["team2"] == "未定" and entries[1]["stage"] == "U-17女子W杯 16強"
+    assert "score1" not in entries[1]
+    assert len(entries) == 3  # 日本の出ない試合は入れない
+    assert "score1" not in entries[2]  # 試合中（終了以外）のスコアは結果にしない

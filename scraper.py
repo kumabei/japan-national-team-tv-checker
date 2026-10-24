@@ -784,6 +784,86 @@ def fetch_yahoo_matches(broadcasts: dict = None, old_matches: list = None, today
     return matches
 
 
+# FIFAの公開API（fifa.comの画面が使っているもの）。FIFA主催の大会だけが対象で、大会ごとに番号がある。
+# スポーツナビに無いU-17などのW杯を補う。AFC主催の大会（U-17アジアカップなど）・親善試合は載っていない
+FIFA_MATCHES_URL = ("https://api.fifa.com/api/v3/calendar/matches?idCompetition={id}"
+                    "&from={start}T00:00:00Z&to={end}T00:00:00Z&language=ja&count=500")
+FIFA_COMPETITIONS = (  # (大会番号, チーム区分, 大会名の頭。若い世代は年代を入れる＝result_group と年代バッジ用)
+    ("17", TEAM_A, "W杯"),
+    ("520", TEAM_A, "W杯予選"),
+    ("103", TEAM_NADESHIKO, "女子W杯"),
+    ("521", TEAM_NADESHIKO, "女子W杯予選"),
+    ("509", TEAM_NADESHIKO, "女子五輪"),
+    ("512", TEAM_YOUTH, "U-23 五輪"),
+    ("104", TEAM_YOUTH, "U-20W杯"),
+    ("108", TEAM_YOUTH, "U-20女子W杯"),
+    ("102", TEAM_YOUTH, "U-17W杯"),
+    ("516", TEAM_YOUTH, "U-17女子W杯"),
+)
+FIFA_FINISHED = 0  # MatchStatus。1は試合前（試合中など、それ以外の値の途中経過は結果にしない）
+
+
+def _fifa_name(side):
+    if not side or not side.get("TeamName"):
+        return "未定"
+    return side["TeamName"][0].get("Description") or "未定"
+
+
+def parse_fifa_matches(results: list, label: str) -> list:
+    """FIFAのAPIの試合一覧から日本戦を抜き出し、merge_matches に渡せる形の行にする。
+
+    時刻は世界標準時なので日本時間に直す。相手が決まっていない試合（決勝トーナメント）は「未定」。
+    スコアは試合終了の試合だけ読む。
+    """
+    entries = []
+    for m in results:
+        home, away = m.get("Home") or {}, m.get("Away") or {}
+        if "JPN" not in (home.get("IdCountry"), away.get("IdCountry")):
+            continue
+        date, time_str, year = utc_iso_to_jst(m["Date"])
+        stage_name = (m.get("StageName") or [{}])[0].get("Description")
+        entry = {
+            "date": date, "time": time_str, "year": year,
+            "stage": normalize_stage(f"{label} {stage_name}" if stage_name else label),
+            "team1": _fifa_name(m.get("Home")), "team2": _fifa_name(m.get("Away")),
+        }
+        if (m.get("MatchStatus") == FIFA_FINISHED
+                and home.get("Score") is not None and away.get("Score") is not None):
+            entry["score1"], entry["score2"] = home["Score"], away["Score"]
+        entries.append(entry)
+    return entries
+
+
+def fetch_fifa_matches(broadcasts: dict = None, old_matches: list = None, today=None,
+                       fetch_json=None, past_days: int = 30, future_days: int = 180) -> list:
+    """FIFA主催の大会の日本戦を、past_days 日前から future_days 日先まで読み、試合の形にして返す。
+
+    読めなかった大会は警告だけ出して飛ばす（3つ目の取得元なので、止めない）。
+    """
+    import requests
+
+    def default_fetch_json(url):
+        res = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=30)
+        res.raise_for_status()
+        return res.json()
+
+    fetch_json = fetch_json or default_fetch_json
+    today = today or datetime.date.today()
+    start = today - datetime.timedelta(days=past_days)
+    end = today + datetime.timedelta(days=future_days)
+    matches = []
+    for comp_id, team, label in FIFA_COMPETITIONS:
+        url = FIFA_MATCHES_URL.format(id=comp_id, start=start.isoformat(), end=end.isoformat())
+        try:
+            entries = parse_fifa_matches(fetch_json(url).get("Results", []), label)
+        except Exception as e:
+            print(f"  警告: FIFAの日程を読めませんでした（{url}）: {e}")
+            continue
+        matches += merge_matches(entries, (broadcasts or {}) if team == TEAM_A else {},
+                                 team=team, old_matches=old_matches)
+    return matches
+
+
 def add_missing_matches(matches: list, others: list, today=None, past_days: int = 30, hours: int = 3):
     """別の取得元（スポーツナビ）にあって手元に無い試合を matches に足す。
 
@@ -1059,22 +1139,30 @@ def main() -> list:
         dedupe_matches(fetched + carry_over_finished(old_matches, fetched))
     )
 
-    print("取得中: スポーツナビの日程・結果")
-    yahoo_matches = fetch_yahoo_matches(broadcasts, old_matches)
-    if not yahoo_matches:
-        # 3つ目の取得元なので、失敗通知（終了コード1）の対象にはしない（文言に「取得できませんでした」を使わない）
-        problems.append("スポーツナビの日程を1件も読めませんでした（取得元の構造変化の可能性）")
-    added, time_conflicts = add_missing_matches(new_matches, yahoo_matches)
-    for m in added:
-        print(f"  スポーツナビから試合を追加: {m['year']}/{m['date']} {m['time']} {m['team1']} 対 {m['team2']}（{m['stage']}）")
-    for mine, other in time_conflicts:
-        problems.append(f"{mine['year']}/{mine['date']} {mine['team1']} 対 {mine['team2']} のキックオフ時刻が"
-                        f"取得元で違います（手元 {mine['time']}／スポーツナビ {other['time']}）")
+    # スポーツナビ（A代表・五輪世代・U-20・女子代表）とFIFA（FIFA主催の大会）で、抜けた試合を足す
+    # これからの試合は前回のデータから引き継がないので、毎回足し直しになる。表示は前回に無かった試合だけ
+    old_keys = {(m.get("year"), m["date"], m["time"], m.get("team", TEAM_A)) for m in old_matches}
+    others = []
+    for source, fetch_other in (("スポーツナビ", fetch_yahoo_matches), ("FIFA", fetch_fifa_matches)):
+        print(f"取得中: {source}の日程・結果")
+        other_matches = fetch_other(broadcasts, old_matches)
+        if not other_matches:
+            # 3つ目の取得元なので、失敗通知（終了コード1）の対象にはしない（文言に「取得できませんでした」を使わない）
+            problems.append(f"{source}の日程を1件も読めませんでした（取得元の構造変化か、該当する大会が無い）")
+        added, time_conflicts = add_missing_matches(new_matches, other_matches)
+        for m in added:
+            if (m.get("year"), m["date"], m["time"], m["team"]) in old_keys:
+                continue
+            print(f"  {source}から試合を追加: {m['year']}/{m['date']} {m['time']} {m['team1']} 対 {m['team2']}（{m['stage']}）")
+        for mine, other in time_conflicts:
+            problems.append(f"{mine['year']}/{mine['date']} {mine['team1']} 対 {mine['team2']} のキックオフ時刻が"
+                            f"取得元で違います（手元 {mine['time']}／{source} {other['time']}）")
+        others.append((source, other_matches))
     new_matches = sort_matches(new_matches)
 
-    # 結果は JFA公式 → スポーツナビ の順に、空のスコアへ入れる。入っているスコアは両方と突き合わせる
-    for source, results in (("JFA公式", fetch_official_results(new_matches)),
-                            ("スポーツナビ", results_from_matches(yahoo_matches))):
+    # 結果は JFA公式 → スポーツナビ → FIFA の順に、空のスコアへ入れる。入っているスコアは全部と突き合わせる
+    for source, results in [("JFA公式", fetch_official_results(new_matches))] + \
+            [(source, results_from_matches(ms)) for source, ms in others]:
         for m in apply_official_results(new_matches, results):
             print(f"  {source}の結果を反映: {m['date']} {m['team1']} {m['score']['home']}-{m['score']['away']} {m['team2']}")
         problems += find_score_conflicts(new_matches, results, source)
