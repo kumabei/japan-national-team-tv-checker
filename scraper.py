@@ -539,8 +539,59 @@ def fetch_soup(url: str):
 JFA_RESULT_URLS = {
     TEAM_A: "https://www.jfa.jp/samuraiblue/schedule_result/{year}.html",
     TEAM_NADESHIKO: "https://www.jfa.jp/nadeshikojapan/schedule_result/{year}.html",
-    TEAM_YOUTH: "https://www.jfa.jp/national_team/u21/schedule_result/{year}.html",
 }
+# 若い世代は年代ごとにページが分かれている（u21＝U-21、u17w＝U-17女子 など。result_group の値）。
+# 以前はU-21のページしか見ておらず、U-17女子W杯の結果が入らなかった
+JFA_YOUTH_RESULT_URL = "https://www.jfa.jp/national_team/{group}/schedule_result/{year}.html"
+
+
+def result_group(match: dict):
+    """結果を突き合わせるときの区分（"a"／"nadeshiko"／"u21"・"u17w" など）を返す。
+
+    若い世代は年代ごとに別のチームなので、大会名から年代を読む（index.htmlの年代バッジと同じ決め方）。
+    読めなければ None（どの年代の結果と突き合わせればよいか分からないので、結果は入れない）。
+    """
+    team = match.get("team", TEAM_A)
+    if team != TEAM_YOUTH:
+        return team
+    stage = match.get("stage") or ""
+    women = "女子" in stage
+    m = re.search(r"U-?(\d{2})", stage, re.I)
+    if m:
+        return f"u{m.group(1)}{'w' if women else ''}"
+    # 2026年アジア大会の男子はU-21代表で参加（index.htmlと同じ決め打ち。次回大会で見直すこと）
+    if re.search(r"アジア(競技)?大会", stage) and not women:
+        return "u21"
+    return None
+
+
+def jfa_result_url(group: str, year: int) -> str:
+    return JFA_RESULT_URLS.get(group, JFA_YOUTH_RESULT_URL).format(group=group, year=year)
+
+
+def _match_date(m: dict):
+    """試合の日付（日本時間）。年が無い・日付が読めなければ None。"""
+    try:
+        month, day = (int(x) for x in m["date"].split("/"))
+        return datetime.date(m["year"], month, day)
+    except (KeyError, TypeError, ValueError):
+        return None
+
+
+def _kickoff(m: dict):
+    """試合の開始日時（日本時間）。時刻が読めなければ None。"""
+    played_on = _match_date(m)
+    try:
+        hour, minute = (int(x) for x in m["time"].split(":"))
+    except (KeyError, ValueError):
+        return None
+    if played_on is None:
+        return None
+    return datetime.datetime.combine(played_on, datetime.time(hour, minute))
+
+
+def _japan_is_home(m: dict) -> bool:
+    return any(n in m["team1"] for n in JAPAN_NAMES)
 
 
 def parse_jfa_results(soup) -> dict:
@@ -564,50 +615,206 @@ def parse_jfa_results(soup) -> dict:
     return results
 
 
-def apply_official_results(matches: list, results_by_team: dict, today=None) -> list:
-    """スコアが空の過去の試合に、JFA公式の結果を入れる（既にあるスコアは上書きしない）。
+def _lookup_result(m: dict, results_by_group: dict):
+    played_on = _match_date(m)
+    if played_on is None:
+        return None
+    return (results_by_group.get(result_group(m), {}).get(played_on.year, {})
+            .get((played_on.month, played_on.day)))
 
-    取得元ごとに「同じチームの同じ日」の結果は1つだけなので、日付で突き合わせる。
+
+def apply_official_results(matches: list, results_by_group: dict, today=None) -> list:
+    """スコアが空の終わった試合に、取得元（JFA公式・スポーツナビ）の結果を入れる（既にあるスコアは上書きしない）。
+
+    取得元ごとに「同じ区分の同じ日」の結果は1つだけなので、日付で突き合わせる。
     対戦相手の名前は取得元で表記が違う（北朝鮮／朝鮮民主主義人民共和国など）ため使わない。
-    JFAのスコアは日本が先なので、日本がteam2の試合ではhome/awayを入れ替える。
-    results_by_team は {チーム: {年: {(月, 日): (日本, 相手)}}}。
+    結果は日本が先なので、日本がteam2の試合ではhome/awayを入れ替える。
+    今日の試合も対象にする（朝6時の更新で、夜中の海外の試合の結果を拾うため。取得元は
+    試合が終わるまでスコアを載せない）。
+    results_by_group は {区分: {年: {(月, 日): (日本, 相手)}}}。区分は result_group の値。
     """
     today = today or datetime.date.today()
     filled = []
     for m in matches:
-        if m.get("score") is not None or m.get("year") is None:
+        if m.get("score") is not None:
             continue
-        month, day = (int(x) for x in m["date"].split("/"))
-        try:
-            if datetime.date(m["year"], month, day) >= today:
-                continue
-        except ValueError:
+        played_on = _match_date(m)
+        if played_on is None or played_on > today:
             continue
-        found = results_by_team.get(m.get("team", TEAM_A), {}).get(m["year"], {}).get((month, day))
+        found = _lookup_result(m, results_by_group)
         if found is None:
             continue
         japan, opponent = found
-        japan_is_home = any(n in m["team1"] for n in JAPAN_NAMES)
-        m["score"] = ({"home": japan, "away": opponent} if japan_is_home
+        m["score"] = ({"home": japan, "away": opponent} if _japan_is_home(m)
                       else {"home": opponent, "away": japan})
         filled.append(m)
     return filled
 
 
-def fetch_official_results(matches: list, today=None) -> dict:
-    """スコアが空の過去試合がある年だけ、JFA公式ページを取得する。失敗しても更新は続ける。"""
+def fetch_official_results(matches: list, today=None, fetch=None) -> dict:
+    """スコアが空の終わった試合がある（区分・年）だけ、JFA公式ページを取得する。失敗しても更新は続ける。"""
+    fetch = fetch or fetch_soup
     today = today or datetime.date.today()
-    years = {m["year"] for m in matches
-             if m.get("score") is None and m.get("year") and m["year"] <= today.year}
+    wanted = set()
+    for m in matches:
+        played_on = _match_date(m)
+        group = result_group(m)
+        if m.get("score") is None and played_on and played_on <= today and group:
+            wanted.add((group, played_on.year))
     results = {}
-    for team, url_tmpl in JFA_RESULT_URLS.items():
-        for year in years:
+    for group, year in sorted(wanted):
+        url = jfa_result_url(group, year)
+        try:
+            results.setdefault(group, {})[year] = parse_jfa_results(fetch(url))
+        except Exception as e:  # ネットワーク・ページ構造の変化・その年代のページが無い、で全体を止めない
+            print(f"  警告: 公式結果を取得できませんでした（{url}）: {e}")
+    return results
+
+
+def results_from_matches(matches: list) -> dict:
+    """スコアの入った試合から、apply_official_results に渡す形の結果を作る（日本が先）。"""
+    results = {}
+    for m in matches:
+        played_on = _match_date(m)
+        group = result_group(m)
+        if m.get("score") is None or played_on is None or group is None:
+            continue
+        home, away = m["score"]["home"], m["score"]["away"]
+        results.setdefault(group, {}).setdefault(played_on.year, {})[(played_on.month, played_on.day)] = (
+            (home, away) if _japan_is_home(m) else (away, home))
+    return results
+
+
+def find_score_conflicts(matches: list, results_by_group: dict, source: str) -> list:
+    """入っているスコアが取得元の結果と違う試合を、要確認の文にして返す。"""
+    conflicts = []
+    for m in matches:
+        if m.get("score") is None:
+            continue
+        found = _lookup_result(m, results_by_group)
+        if found is None:
+            continue
+        home, away = m["score"]["home"], m["score"]["away"]
+        mine = (home, away) if _japan_is_home(m) else (away, home)
+        if mine != found:
+            conflicts.append(
+                f"{m['year']}/{m['date']} {m['team1']} 対 {m['team2']} のスコアが{source}と違います"
+                f"（手元 日本{mine[0]}-{mine[1]}／{source} 日本{found[0]}-{found[1]}）")
+    return conflicts
+
+
+# スポーツナビの日程・結果ページ（A代表・五輪世代・U-20・女子代表）。goal.com・JFAに続く3つ目の取得元で、
+# 抜けている試合を足し、スコアと今後のキックオフ時刻を突き合わせるのに使う。U-17などの年代のページは無い
+YAHOO_SCHEDULE_URLS = (
+    (TEAM_A, "https://soccer.yahoo.co.jp/japan/category/men/teams/142/schedule?year={year}"),
+    (TEAM_NADESHIKO, "https://soccer.yahoo.co.jp/japan/category/women/teams/139/schedule?year={year}"),
+    (TEAM_YOUTH, "https://soccer.yahoo.co.jp/japan/category/u_men/teams/141/schedule?year={year}"),
+    (TEAM_YOUTH, "https://soccer.yahoo.co.jp/japan/category/u20_men/teams/145/schedule?year={year}"),
+)
+_AGE_PREFIX_RE = re.compile(r"^(U-\d{2})(.+)$")
+
+
+def _strip_age(name: str):
+    """「U-21日本」→ ("U-21", "日本")。年代の付かない名前は (None, 名前)。"""
+    m = _AGE_PREFIX_RE.match(name)
+    return (m.group(1), m.group(2)) if m else (None, name)
+
+
+def parse_yahoo_schedule(soup, year: int) -> list:
+    """スポーツナビの日程・結果ページを読み、merge_matches に渡せる形の行にする。
+
+    表の行は [日時, 大会, 勝敗, ホーム, スコア, アウェイ, 会場]。時刻は日本時間で、深夜は
+    「26:00」のように24時以降で書かれるので、翌日の 02:00 に直す。
+    時刻が「未定」の試合は入れない（画面は時刻から残り時間を計算する。goal.comの日程も同じ扱い）。
+    スコアは「試合終了」の行だけ読む（試合中の途中経過を結果として入れない）。
+    若い世代の名前は「U-21日本」「U-23タイ」のように年代が付くので外し、日本の年代が
+    大会名に無ければ大会名の頭に足す（年代バッジと result_group が年代を読めるように）。
+    """
+    entries = []
+    for row in soup.find_all("tr"):
+        date_cell = row.find("td", class_="sc-tableGame__data--date")
+        teams = row.find_all("td", class_="sc-tableGame__data--team")
+        if date_cell is None or len(teams) < 2:
+            continue
+        dm = re.match(r"(\d{1,2})/(\d{1,2}).*?(\d{1,2}):(\d{2})", date_cell.get_text(" ", strip=True))
+        if not dm:
+            continue
+        month, day, hour, minute = (int(x) for x in dm.groups())
+        kickoff = datetime.datetime(year, month, day) + datetime.timedelta(hours=hour, minutes=minute)
+        (age1, team1), (age2, team2) = (_strip_age(t.get_text(strip=True)) for t in teams[:2])
+        if not any(n in team1 or n in team2 for n in JAPAN_NAMES):
+            continue
+        category = row.find("td", class_="sc-tableGame__data--category")
+        stage = normalize_stage(category.get_text(" ", strip=True) if category else "")
+        japan_age = age1 if any(n in team1 for n in JAPAN_NAMES) else age2
+        if japan_age and japan_age not in stage:
+            stage = f"{japan_age} {stage}"
+        entry = {
+            "date": f"{kickoff.month}/{kickoff.day}", "time": f"{kickoff.hour:02d}:{kickoff.minute:02d}",
+            "year": kickoff.year, "stage": stage, "team1": team1, "team2": team2,
+        }
+        score_cell = row.find("td", class_="sc-tableGame__data--score")
+        score_text = score_cell.get_text(" ", strip=True) if score_cell else ""
+        sm = re.search(r"(\d+)\s*-\s*(\d+)", score_text)
+        if sm and "試合終了" in score_text:
+            entry["score1"], entry["score2"] = int(sm.group(1)), int(sm.group(2))
+        entries.append(entry)
+    return entries
+
+
+def fetch_yahoo_matches(broadcasts: dict = None, old_matches: list = None, today=None, fetch=None) -> list:
+    """スポーツナビの4ページを今年・来年の分読み、試合の形にして返す。
+
+    A代表には goal.com の放送表（broadcasts）を当てる（goal.comの日程に無い試合でも、
+    放送表には載っていることがあるため）。読めなかったページは警告だけ出して飛ばす。
+    """
+    fetch = fetch or fetch_soup
+    today = today or datetime.date.today()
+    matches = []
+    for team, url_tmpl in YAHOO_SCHEDULE_URLS:
+        for year in (today.year, today.year + 1):
             url = url_tmpl.format(year=year)
             try:
-                results.setdefault(team, {})[year] = parse_jfa_results(fetch_soup(url))
-            except Exception as e:  # ネットワーク・ページ構造の変化で全体を止めない
-                print(f"  警告: 公式結果を取得できませんでした（{url}）: {e}")
-    return results
+                entries = parse_yahoo_schedule(fetch(url), year)
+            except Exception as e:
+                print(f"  警告: スポーツナビの日程を読めませんでした（{url}）: {e}")
+                continue
+            matches += merge_matches(entries, (broadcasts or {}) if team == TEAM_A else {},
+                                     team=team, old_matches=old_matches)
+    return matches
+
+
+def add_missing_matches(matches: list, others: list, today=None, past_days: int = 30, hours: int = 3):
+    """別の取得元（スポーツナビ）にあって手元に無い試合を matches に足す。
+
+    同じ区分で、開始時刻の差が hours 時間以内なら同じ試合とみなす（取得元によって
+    キックオフ時刻が数分ずれることがある）。終わった試合は past_days 日前までだけ足す
+    （それより前の試合で一覧を埋めないため）。
+    返り値は（足した試合, 時刻が食い違う「これからの」試合の (手元, 取得元) の組）。
+    """
+    today = today or datetime.date.today()
+    cutoff = datetime.datetime.combine(today - datetime.timedelta(days=past_days), datetime.time())
+    start_of_today = datetime.datetime.combine(today, datetime.time())
+    added, time_conflicts = [], []
+    for other in others:
+        ko = _kickoff(other)
+        if ko is None or ko < cutoff:
+            continue
+        group = result_group(other)
+        same = None
+        for m in matches:
+            k = _kickoff(m)
+            if (m.get("team", TEAM_A) == other.get("team", TEAM_A) and k is not None
+                    and abs(k - ko) <= datetime.timedelta(hours=hours)
+                    and not (group and result_group(m) and group != result_group(m))):
+                same = m
+                break
+        if same is None:
+            matches.append(other)
+            added.append(other)
+        elif same["time"] != other["time"] and ko >= start_of_today:
+            time_conflicts.append((same, other))
+    return added, time_conflicts
 
 
 JFA_A_SCHEDULE_URL = JFA_RESULT_URLS[TEAM_A]
@@ -852,9 +1059,25 @@ def main() -> list:
         dedupe_matches(fetched + carry_over_finished(old_matches, fetched))
     )
 
-    filled = apply_official_results(new_matches, fetch_official_results(new_matches))
-    for m in filled:
-        print(f"  公式結果を反映: {m['date']} {m['team1']} {m['score']['home']}-{m['score']['away']} {m['team2']}")
+    print("取得中: スポーツナビの日程・結果")
+    yahoo_matches = fetch_yahoo_matches(broadcasts, old_matches)
+    if not yahoo_matches:
+        # 3つ目の取得元なので、失敗通知（終了コード1）の対象にはしない（文言に「取得できませんでした」を使わない）
+        problems.append("スポーツナビの日程を1件も読めませんでした（取得元の構造変化の可能性）")
+    added, time_conflicts = add_missing_matches(new_matches, yahoo_matches)
+    for m in added:
+        print(f"  スポーツナビから試合を追加: {m['year']}/{m['date']} {m['time']} {m['team1']} 対 {m['team2']}（{m['stage']}）")
+    for mine, other in time_conflicts:
+        problems.append(f"{mine['year']}/{mine['date']} {mine['team1']} 対 {mine['team2']} のキックオフ時刻が"
+                        f"取得元で違います（手元 {mine['time']}／スポーツナビ {other['time']}）")
+    new_matches = sort_matches(new_matches)
+
+    # 結果は JFA公式 → スポーツナビ の順に、空のスコアへ入れる。入っているスコアは両方と突き合わせる
+    for source, results in (("JFA公式", fetch_official_results(new_matches)),
+                            ("スポーツナビ", results_from_matches(yahoo_matches))):
+        for m in apply_official_results(new_matches, results):
+            print(f"  {source}の結果を反映: {m['date']} {m['team1']} {m['score']['home']}-{m['score']['away']} {m['team2']}")
+        problems += find_score_conflicts(new_matches, results, source)
 
     for m in fill_broadcasts_from_jfa(new_matches):
         names = m["tv_onair"] + m["tv_bs"] + m["tv_net"]

@@ -34,6 +34,12 @@ from scraper import (
     fill_broadcasts_from_jfa,
     preserve_known_values,
     find_suspicious_matches,
+    result_group,
+    fetch_official_results,
+    parse_yahoo_schedule,
+    add_missing_matches,
+    results_from_matches,
+    find_score_conflicts,
 )
 import datetime
 
@@ -643,3 +649,101 @@ def test_find_suspicious_matches_flags_near_a_matches_without_broadcast():
     covered = _finished_match(2026, "9/28", "19:25", team="a", tv_onair=["日テレ"])
     nadeshiko = _finished_match(2026, "9/29", "19:00", team="nadeshiko")
     assert find_suspicious_matches([near, far, covered, nadeshiko], today=today) == [near]
+
+
+def test_result_group_reads_age_group_of_youth_matches():
+    assert result_group({"team": "a", "stage": "親善試合"}) == "a"
+    assert result_group({"team": "nadeshiko", "stage": "女子アジア大会"}) == "nadeshiko"
+    assert result_group({"team": "youth", "stage": "U-17女子W杯 第1節"}) == "u17w"
+    assert result_group({"team": "youth", "stage": "U-20W杯 グループA 第1節"}) == "u20"
+    assert result_group({"team": "youth", "stage": "アジア大会男子準決勝"}) == "u21"
+    assert result_group({"team": "youth", "stage": "国際親善試合"}) is None
+
+
+def test_fetch_official_results_uses_the_age_group_page_and_fills_todays_match():
+    # 実際に起きた抜け: U-17女子W杯の結果を、U-21のページしか見ていなかったので取れなかった
+    today = datetime.date(2026, 10, 25)
+    html = ('<table><tr><td class="date">10/19(月)</td><td class="score">〇5-0</td></tr>'
+            '<tr><td class="date">10/25(日)</td><td class="score">〇1-0</td></tr></table>')
+    fetched = []
+
+    def fake_fetch(url):
+        fetched.append(url)
+        return BeautifulSoup(html, "html.parser")
+
+    zambia = _finished_match(2026, "10/19", "00:00", team2="ザンビア", team="youth", stage="U-17女子W杯 第1節")
+    venezuela = _finished_match(2026, "10/25", "03:00", team1="ベネズエラ", team2="日本",
+                                team="youth", stage="U-17女子W杯第3節")
+    unknown = _finished_match(2026, "10/19", "00:00", team="youth", stage="国際親善試合")
+    results = fetch_official_results([zambia, venezuela, unknown], today=today, fetch=fake_fetch)
+    assert fetched == ["https://www.jfa.jp/national_team/u17w/schedule_result/2026.html"]
+    apply_official_results([zambia, venezuela, unknown], results, today=today)
+    assert zambia["score"] == {"home": 5, "away": 0}
+    assert venezuela["score"] == {"home": 0, "away": 1}  # 日本がteam2なので入れ替える
+    assert unknown["score"] is None
+
+
+def _yahoo_row(date_html, stage, home, score_html, away):
+    return (f'<tr><td class="sc-tableGame__data sc-tableGame__data--date">{date_html}</td>'
+            f'<td class="sc-tableGame__data sc-tableGame__data--category">{stage}</td>'
+            '<td class="sc-tableGame__data sc-tableGame__data--victory">○</td>'
+            f'<td class="sc-tableGame__data sc-tableGame__data--team"><span><span>{home}</span></span></td>'
+            f'<td class="sc-tableGame__data sc-tableGame__data--score">{score_html}</td>'
+            f'<td class="sc-tableGame__data sc-tableGame__data--team"><a><span>{away}</span></a></td>'
+            '<td class="sc-tableGame__data sc-tableGame__data--venue">会場</td></tr>')
+
+
+def test_parse_yahoo_schedule_converts_late_night_time_strips_age_and_reads_only_finished_scores():
+    finished = '<p class="sc-tableGame__scoreDetail">0 - <span>1</span></p><p>試合終了</p>'
+    html = "<table>" + "".join([
+        _yahoo_row("3/28（土）<br/>26:00", "代表親善試合", "スコットランド", finished, "日本"),
+        _yahoo_row("9/30（水）<br/>19:30", "アジア大会 準決勝", "U-23ウズベキスタン",
+                   '<p>1 - 1 (8 PK 9)</p><p>試合終了</p>', "U-21日本"),
+        _yahoo_row("11/14（土）<br/>19:15", "代表親善試合", "日本", "<p>-</p><p>試合前</p>", "ブラジル"),
+        _yahoo_row("12/31（木）<br/>25:00", "代表親善試合", "日本", "<p>2 - 0</p><p>前半</p>", "X"),
+        _yahoo_row("12/30（水）<br/>未定", "代表親善試合", "日本", "<p>-</p>", "未定"),
+    ]) + "</table>"
+    entries = parse_yahoo_schedule(BeautifulSoup(html, "html.parser"), 2026)
+    assert entries[0] == {"date": "3/29", "time": "02:00", "year": 2026, "stage": "代表親善試合",
+                          "team1": "スコットランド", "team2": "日本", "score1": 0, "score2": 1}
+    assert entries[1]["team1"] == "ウズベキスタン" and entries[1]["team2"] == "日本"
+    assert entries[1]["stage"] == "U-21 アジア大会 準決勝"
+    assert (entries[1]["score1"], entries[1]["score2"]) == (1, 1)
+    assert "score1" not in entries[2]
+    assert (entries[3]["year"], entries[3]["date"], entries[3]["time"]) == (2027, "1/1", "01:00")
+    assert "score1" not in entries[3]  # 試合中の途中経過は結果にしない
+    assert len(entries) == 4  # 時刻未定の試合は入れない
+
+
+def test_add_missing_matches_adds_recent_missing_ones_and_reports_time_differences():
+    today = datetime.date(2026, 10, 25)
+    have = [_finished_match(2026, "11/17", "22:00", team="a", team2="パラグアイ"),
+            _finished_match(2026, "10/1", "19:00", team="a", team2="エクアドル")]
+    yahoo = [_finished_match(2026, "11/14", "19:15", team="a", team2="ブラジル"),
+             _finished_match(2026, "11/17", "22:10", team="a", team2="パラグアイ"),
+             _finished_match(2026, "10/1", "19:10", team="a", team2="エクアドル"),
+             _finished_match(2026, "10/3", "19:30", team="youth", stage="U-21 アジア大会 決勝"),
+             _finished_match(2026, "9/16", "19:30", team="youth", stage="U-21 アジア大会")]
+    added, conflicts = add_missing_matches(have, yahoo, today=today)
+    assert [m["date"] for m in added] == ["11/14", "10/3"]  # 9/16は30日より前なので足さない
+    assert len(have) == 4
+    assert conflicts == [(have[0], yahoo[1])]  # 終わった10/1の10分差は挙げない
+
+
+def test_add_missing_matches_keeps_different_age_groups_apart():
+    today = datetime.date(2026, 10, 25)
+    have = [_finished_match(2026, "10/1", "08:00", team="youth", stage="U-17女子W杯")]
+    yahoo = [_finished_match(2026, "10/1", "08:00", team="youth", stage="U-20W杯 グループA 第2節")]
+    added, _ = add_missing_matches(have, yahoo, today=today)
+    assert added == yahoo
+
+
+def test_results_from_matches_and_score_conflicts_compare_from_japans_side():
+    yahoo = [_finished_match(2026, "9/24", "19:05", team1="ウルグアイ", team2="日本", team="a",
+                             score={"home": 1, "away": 3})]
+    results = results_from_matches(yahoo)
+    assert results == {"a": {2026: {(9, 24): (3, 1)}}}
+    same = _finished_match(2026, "9/24", "19:05", team2="ウルグアイ", team="a", score={"home": 3, "away": 1})
+    wrong = _finished_match(2026, "9/24", "19:05", team2="ウルグアイ", team="a", score={"home": 1, "away": 3})
+    assert find_score_conflicts([same], results, "スポーツナビ") == []
+    assert len(find_score_conflicts([wrong], results, "スポーツナビ")) == 1
