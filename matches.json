@@ -1112,20 +1112,6 @@
   {
     "date": "1/11",
     "time": "19:30",
-    "stage": "アジアカップ グループF 第1節",
-    "team1": "日本",
-    "team2": "インドネシア",
-    "tv_onair": [],
-    "tv_bs": [],
-    "tv_net": [],
-    "is_japan": true,
-    "score": null,
-    "team": "a",
-    "year": 2027
-  },
-  {
-    "date": "1/11",
-    "time": "23:00",
     "stage": "AFCアジアカップ アジアカップグループ。 F",
     "team1": "日本",
     "team2": "インドネシア",
@@ -1140,20 +1126,6 @@
   {
     "date": "1/16",
     "time": "19:30",
-    "stage": "アジアカップ グループF 第2節",
-    "team1": "タイ",
-    "team2": "日本",
-    "tv_onair": [],
-    "tv_bs": [],
-    "tv_net": [],
-    "is_japan": true,
-    "score": null,
-    "team": "a",
-    "year": 2027
-  },
-  {
-    "date": "1/16",
-    "time": "23:00",
     "stage": "AFCアジアカップ アジアカップグループ。 F",
     "team1": "タイ",
     "team2": "日本",
@@ -1168,20 +1140,6 @@
   {
     "date": "1/20",
     "time": "19:30",
-    "stage": "アジアカップ グループF 第3節",
-    "team1": "日本",
-    "team2": "カタール",
-    "tv_onair": [],
-    "tv_bs": [],
-    "tv_net": [],
-    "is_japan": true,
-    "score": null,
-    "team": "a",
-    "year": 2027
-  },
-  {
-    "date": "1/20",
-    "time": "23:00",
     "stage": "AFCアジアカップ アジアカップグループ。 F",
     "team1": "日本",
     "team2": "カタール",
