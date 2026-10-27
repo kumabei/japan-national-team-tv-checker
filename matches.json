@@ -1103,7 +1103,9 @@
     "team2": "ブラジル",
     "tv_onair": [],
     "tv_bs": [],
-    "tv_net": [],
+    "tv_net": [
+      "ABEMA"
+    ],
     "is_japan": true,
     "score": null,
     "team": "nadeshiko",
