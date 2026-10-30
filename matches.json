@@ -981,7 +981,9 @@
     "team2": "日本",
     "tv_onair": [],
     "tv_bs": [],
-    "tv_net": [],
+    "tv_net": [
+      "DAZN"
+    ],
     "is_japan": true,
     "score": null,
     "team": "youth",
