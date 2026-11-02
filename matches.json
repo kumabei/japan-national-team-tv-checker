@@ -985,6 +985,23 @@
       "DAZN"
     ],
     "is_japan": true,
+    "score": {
+      "home": 0,
+      "away": 1
+    },
+    "team": "youth",
+    "year": 2026
+  },
+  {
+    "date": "11/5",
+    "time": "00:00",
+    "stage": "U-17女子W杯 準決勝",
+    "team1": "日本",
+    "team2": "北朝鮮",
+    "tv_onair": [],
+    "tv_bs": [],
+    "tv_net": [],
+    "is_japan": true,
     "score": null,
     "team": "youth",
     "year": 2026
