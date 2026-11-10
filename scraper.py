@@ -64,7 +64,8 @@ BROADCASTER_MAP = {
 }
 
 TERRESTRIAL_BROADCASTERS = {"NHK", "日テレ", "フジテレビ", "テレビ朝日", "TBS", "テレビ東京"}
-BS_BROADCASTERS = {"NHK BS"}
+# J SPORTS は有料の衛星放送。JFAの若い世代の大会（U-17W杯など）の放送ページに出てくる
+BS_BROADCASTERS = {"NHK BS", "J SPORTS"}
 NET_BROADCASTERS = {"DAZN", "ABEMA", "U-NEXT", "TVer"}
 
 JAPAN_NAMES = {"日本", "サムライブルー", "日本代表"}
@@ -897,9 +898,9 @@ def add_missing_matches(matches: list, others: list, today=None, past_days: int 
     return added, time_conflicts
 
 
-JFA_A_SCHEDULE_URL = JFA_RESULT_URLS[TEAM_A]
 JFA_BASE = "https://www.jfa.jp"
-_JFA_STRIP_RE = re.compile(r"(全国ネット生中継|全国生中継|生中継|ライブ配信)")
+# 「ABEMAにて無料生配信」のような「〜にて…配信」も落とす（なでしこ 2026/12/5 の書き方）
+_JFA_STRIP_RE = re.compile(r"(全国ネット生中継|全国生中継|生中継|ライブ配信|にて.*配信)")
 _KNOWN_BROADCASTERS = TERRESTRIAL_BROADCASTERS | BS_BROADCASTERS | NET_BROADCASTERS
 
 
@@ -955,42 +956,110 @@ def parse_jfa_about_page(soup, time_str: str = None) -> list:
     return []
 
 
-def fill_broadcasts_from_jfa(matches: list, today=None, fetch=None) -> list:
-    """放送局が空のA代表戦に、JFA公式の放送情報を入れる（既にある放送局は上書きしない）。
+_JFA_TV_DATE_RE = re.compile(r"^\s*(\d{1,2})/(\d{1,2})")
+
+
+def _known_names_in_cell(text: str) -> list:
+    """表のセル1つから、知っている局名を取り出す（「J SPORTS」のように空白を含む名前はセル全体で見る）。"""
+    whole = normalize_broadcaster(_JFA_STRIP_RE.sub("", text).strip())
+    if whole in _KNOWN_BROADCASTERS:
+        return [whole]
+    return parse_jfa_broadcast_text(text)
+
+
+def parse_jfa_tv_page(soup, month: int, day: int, time_str: str = None) -> list:
+    """若い世代の大会の「TV放送/ライブ配信」ページ（tv.html）から、日本戦の放送局を読む。
+
+    表の行は [日程, 配信時間, チャンネル, 内容, 形態]。日本が出る行（内容に「日本」）のうち、
+    日程が試合の日と同じ行を読む。日本時間の深夜0〜4時台の試合は、表では前の日の
+    「深夜0:00～」として載るので、前の日の行も見る。
+    """
+    dates = {(month, day)}
+    try:
+        hour = int((time_str or "").split(":")[0])
+    except ValueError:
+        hour = None
+    if hour is not None and hour < 5:
+        prev = datetime.date(2000, month, day) - datetime.timedelta(days=1)  # 年は日付の計算用（うるう年）
+        dates.add((prev.month, prev.day))
+    for row in soup.find_all("tr"):
+        cells = [c.get_text(" ", strip=True) for c in row.find_all(["td", "th"])]
+        if not cells or "日本" not in " ".join(cells[1:]):
+            continue
+        dm = _JFA_TV_DATE_RE.match(cells[0])
+        if not dm or (int(dm.group(1)), int(dm.group(2))) not in dates:
+            continue
+        names = []
+        for cell in cells[1:]:
+            for name in _known_names_in_cell(cell):
+                if name not in names:
+                    names.append(name)
+        if names:
+            return names
+    return []
+
+
+def fill_broadcasts_from_jfa(matches: list, today=None, fetch=None, past_days: int = 30,
+                             future_days: int = 180) -> list:
+    """放送局が空の試合に、JFA公式の放送情報を入れる（既にある放送局は上書きしない）。
 
     goal.comは終了後の試合の放送行を落とすうえ、ページ構造が変わると放送局が
     1つも取れなくなる。JFAは主催者の公式情報なので、第2の取得元として使う。
-    失敗しても更新は止めない。
+    以前はA代表だけだったが、なでしこ・若い世代も対象にした（2026-11-10）。
+    放送局が空の試合をジャービスがWeb検索で調べると毎回USAGEを使うため、自動更新の中で埋める。
+    ページは2種類：試合・大会の概要（about.html）と、若い世代の大会の放送ページ（tv.html）。
+    past_days日より前に終わった試合と、future_days日より先の試合は見ない（毎回の取得を増やさないため。
+    半年より先の放送局はまず発表されておらず、来年・再来年の日程ページは404になる）。失敗しても更新は止めない。
     """
     fetch = fetch or fetch_soup
     today = today or datetime.date.today()
-    targets = [m for m in matches
-               if m.get("team", TEAM_A) == TEAM_A and m.get("year") == today.year
-               and not _has_broadcast(m)]
+    since = today - datetime.timedelta(days=past_days)
+    until = today + datetime.timedelta(days=future_days)
+    targets = []
+    for m in matches:
+        played_on = _match_date(m)
+        group = result_group(m)
+        if played_on is None or not (since <= played_on <= until) or group is None or _has_broadcast(m):
+            continue
+        targets.append((m, group, played_on))
     if not targets:
         return []
     filled = []
-    try:
-        links = parse_jfa_schedule_links(fetch(JFA_A_SCHEDULE_URL.format(year=today.year)))
-    except Exception as e:
-        print(f"  警告: JFAの日程ページを取得できませんでした: {e}")
-        return []
+    schedules = {}  # (区分, 年) → {(月, 日): パス}。失敗は None で記憶
     pages = {}  # 同じ大会ページを試合ごとに取り直さないためのキャッシュ（失敗もNoneで記憶）
-    for m in targets:
-        month, day = (int(x) for x in m["date"].split("/"))
-        path = links.get((month, day))
-        if not path:
-            continue
-        url = JFA_BASE + path.rstrip("/") + "/about.html"
+
+    def get_page(url):
         if url not in pages:
             try:
                 pages[url] = fetch(url)
             except Exception as e:  # 404（試合ページ未公開・大会ページに概要が無い）など
                 print(f"  警告: JFAの試合ページを取得できませんでした（{url}）: {e}")
                 pages[url] = None
-        if pages[url] is None:
+        return pages[url]
+
+    for m, group, played_on in targets:
+        key = (group, played_on.year)
+        if key not in schedules:
+            try:
+                schedules[key] = parse_jfa_schedule_links(fetch(jfa_result_url(group, played_on.year)))
+            except Exception as e:
+                print(f"  警告: JFAの日程ページを取得できませんでした（{group} {played_on.year}年）: {e}")
+                schedules[key] = None
+        links = schedules[key]
+        if not links:
             continue
-        names = parse_jfa_about_page(pages[url], m["time"])
+        path = links.get((played_on.month, played_on.day))
+        if not path:
+            continue
+        base = JFA_BASE + path.rstrip("/")
+        names = []
+        about = get_page(base + "/about.html")
+        if about is not None:
+            names = parse_jfa_about_page(about, m["time"])
+        if not names and m.get("team") == TEAM_YOUTH:
+            tv = get_page(base + "/tv.html")
+            if tv is not None:
+                names = parse_jfa_tv_page(tv, played_on.month, played_on.day, m["time"])
         if not names:
             continue
         m["tv_onair"] = [n for n in names if classify_broadcaster(n) == "onair"]

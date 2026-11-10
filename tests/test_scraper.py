@@ -31,6 +31,7 @@ from scraper import (
     parse_jfa_broadcast_text,
     parse_jfa_schedule_links,
     parse_jfa_about_page,
+    parse_jfa_tv_page,
     fill_broadcasts_from_jfa,
     preserve_known_values,
     find_suspicious_matches,
@@ -623,13 +624,84 @@ def test_fill_broadcasts_from_jfa_fills_only_empty_a_matches_and_survives_fetch_
     empty = _finished_match(2026, "9/28", "19:25", team="a", team2="ベネズエラ")
     has = _finished_match(2026, "9/28", "19:25", team="a", tv_onair=["TBS"])
     failing = _finished_match(2026, "10/1", "19:10", team="a", team2="エクアドル")
-    other_team = _finished_match(2026, "9/28", "19:25", team="nadeshiko")
-    filled = fill_broadcasts_from_jfa([empty, has, failing, other_team],
+    filled = fill_broadcasts_from_jfa([empty, has, failing],
                                       today=datetime.date(2026, 9, 26), fetch=fake_fetch)
     assert filled == [empty]
     assert empty["tv_onair"] == ["日テレ"] and empty["tv_net"] == ["TVer"]
     assert has["tv_onair"] == ["TBS"]
-    assert failing["tv_onair"] == [] and other_team["tv_onair"] == []
+    assert failing["tv_onair"] == []
+
+
+# JFAの若い世代の大会「TV放送/ライブ配信」ページ（tv.html）の形。2025年U-17W杯の実物を縮めたもの。
+# 日本時間の深夜0時台の試合は、日付の欄が前の日（「11/19(水) 深夜0:00～」）になっている
+_JFA_TV = (
+    '<p>J SPORTSでグループリーグ・Round32・Roud16の日本戦全試合を生放送・配信予定</p>'
+    '<table class="table_theme1"><tr><th>日程</th><th>配信時間(予定)</th><th>チャンネル</th><th>内容</th><th>形態</th></tr>'
+    '<tr><td>11/19(水)</td><td>2025年11月19日(水)深夜0:00～</td><td>J SPORTS</td>'
+    '<td>ラウンド16 北朝鮮 vs 日本</td><td>LIVE</td></tr>'
+    '<tr><td>11/21(金)</td><td>2025年11月21日(金)21:30～</td><td>J SPORTS</td>'
+    '<td>グループリーグ 日本 vs コロンビア</td><td>LIVE</td></tr>'
+    '<tr><td>11/22(土)</td><td>2025年11月22日(土)21:30～</td><td>J SPORTS</td>'
+    '<td>準々決勝 ブラジル vs フランス</td><td>LIVE</td></tr></table>'
+)
+
+
+def test_parse_jfa_tv_page_reads_japan_row_by_date_including_late_night():
+    soup = BeautifulSoup(_JFA_TV, "html.parser")
+    assert parse_jfa_tv_page(soup, 11, 21, "21:30") == ["J SPORTS"]
+    # 日本時間 11/20 0:30 の試合は、表では前の日（11/19 深夜）の行に載る
+    assert parse_jfa_tv_page(soup, 11, 20, "00:30") == ["J SPORTS"]
+    # 日本が出ない試合の行は読まない
+    assert parse_jfa_tv_page(soup, 11, 22, "21:30") == []
+    # 夜の試合は前の日の行を見ない
+    assert parse_jfa_tv_page(soup, 11, 20, "21:30") == []
+
+
+def test_j_sports_is_a_known_bs_broadcaster():
+    assert classify_broadcaster("J SPORTS") == "bs"
+
+
+def test_fill_broadcasts_from_jfa_covers_nadeshiko_and_youth():
+    pages = {
+        "https://www.jfa.jp/nadeshikojapan/schedule_result/2026.html":
+            '<table><tr><td class="date">11/29(日)</td><td><a href="/nadeshikojapan/20261129/">x</a></td></tr></table>',
+        "https://www.jfa.jp/nadeshikojapan/20261129/about.html": _JFA_SINGLE,
+        "https://www.jfa.jp/national_team/u17/schedule_result/2026.html":
+            '<table><tr><td class="date">11/21(土)</td>'
+            '<td><a href="/national_team/u17_2026/u17_worldcup2026/">x</a></td></tr></table>',
+        "https://www.jfa.jp/national_team/u17_2026/u17_worldcup2026/tv.html": _JFA_TV,
+    }
+    fetched = []
+
+    def fake_fetch(url):
+        fetched.append(url)
+        if url in pages:
+            return BeautifulSoup(pages[url], "html.parser")
+        raise RuntimeError("404")  # U-17の about.html は無い
+
+    nadeshiko = _finished_match(2026, "11/29", "13:55", team="nadeshiko", team2="ブラジル")
+    youth = _finished_match(2026, "11/21", "21:30", team="youth", team2="コロンビア",
+                            stage="U-17W杯 1st ステージ")
+    unknown_age = _finished_match(2026, "11/21", "21:30", team="youth", stage="親善試合")
+    filled = fill_broadcasts_from_jfa([nadeshiko, youth, unknown_age],
+                                      today=datetime.date(2026, 11, 10), fetch=fake_fetch)
+    assert filled == [nadeshiko, youth]
+    assert nadeshiko["tv_onair"] == ["日テレ"] and nadeshiko["tv_net"] == ["TVer"]
+    assert youth["tv_bs"] == ["J SPORTS"]
+    assert unknown_age["tv_bs"] == []
+
+
+def test_fill_broadcasts_from_jfa_skips_matches_long_past_or_far_ahead():
+    def fake_fetch(url):
+        raise AssertionError(f"取りに行かないはず: {url}")
+
+    old = _finished_match(2026, "9/1", "19:25", team="a")
+    far = _finished_match(2028, "1/3", "02:00", team="a")
+    assert fill_broadcasts_from_jfa([old, far], today=datetime.date(2026, 11, 10), fetch=fake_fetch) == []
+
+
+def test_parse_jfa_broadcast_text_reads_niteseihaishin():
+    assert parse_jfa_broadcast_text("ABEMAにて無料生配信") == ["ABEMA"]
 
 
 def test_preserve_known_values_restores_lost_broadcast_and_score_but_not_changed_ones():
