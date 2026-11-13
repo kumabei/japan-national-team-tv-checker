@@ -1033,14 +1033,14 @@
   {
     "date": "11/14",
     "time": "03:00",
-    "stage": "U-21代表親善試合",
-    "team1": "スペイン",
-    "team2": "日本",
-    "tv_onair": [],
-    "tv_bs": [],
-    "tv_net": [
-      "ABEMA"
+    "stage": "国際親善試合",
+    "team1": "日本U21",
+    "team2": "スペインU21",
+    "tv_onair": [
+      "ABEMA無料"
     ],
+    "tv_bs": [],
+    "tv_net": [],
     "is_japan": true,
     "score": null,
     "team": "youth",
@@ -1086,14 +1086,14 @@
   {
     "date": "11/18",
     "time": "01:00",
-    "stage": "U-21代表親善試合",
-    "team1": "エジプト",
-    "team2": "日本",
-    "tv_onair": [],
-    "tv_bs": [],
-    "tv_net": [
-      "ABEMA"
+    "stage": "国際親善試合",
+    "team1": "日本U21",
+    "team2": "エジプトU21",
+    "tv_onair": [
+      "ABEMA無料"
     ],
+    "tv_bs": [],
+    "tv_net": [],
     "is_japan": true,
     "score": null,
     "team": "youth",
