@@ -1060,7 +1060,10 @@
       "U-NEXT"
     ],
     "is_japan": true,
-    "score": null,
+    "score": {
+      "home": 3,
+      "away": 2
+    },
     "team": "a",
     "year": 2026
   },
