@@ -563,6 +563,7 @@ def result_group(match: dict):
     """結果を突き合わせるときの区分（"a"／"nadeshiko"／"u21"・"u17w" など）を返す。
 
     若い世代は年代ごとに別のチームなので、大会名から年代を読む（index.htmlの年代バッジと同じ決め方）。
+    大会名に無ければチーム名（「日本U21」など）から読む。
     読めなければ None（どの年代の結果と突き合わせればよいか分からないので、結果は入れない）。
     """
     team = match.get("team", TEAM_A)
@@ -576,6 +577,10 @@ def result_group(match: dict):
     # 2026年アジア大会の男子はU-21代表で参加（index.htmlと同じ決め打ち。次回大会で見直すこと）
     if re.search(r"アジア(競技)?大会", stage) and not women:
         return "u21"
+    # 親善試合は大会名に年代が入らず、チーム名（「日本U21」など）にだけ付くことがある
+    m = re.search(r"U-?(\d{2})", f"{match.get('team1', '')} {match.get('team2', '')}", re.I)
+    if m:
+        return f"u{m.group(1)}{'w' if women else ''}"
     return None
 
 

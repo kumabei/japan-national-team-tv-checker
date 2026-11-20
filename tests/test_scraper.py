@@ -729,6 +729,9 @@ def test_result_group_reads_age_group_of_youth_matches():
     assert result_group({"team": "a", "stage": "親善試合"}) == "a"
     assert result_group({"team": "nadeshiko", "stage": "女子アジア大会"}) == "nadeshiko"
     assert result_group({"team": "youth", "stage": "U-17女子W杯 第1節"}) == "u17w"
+    # 親善試合は大会名に年代が無く、チーム名にだけ付く（2026-11-14・11-18のU-21の試合）
+    assert result_group({"team": "youth", "stage": "国際親善試合",
+                         "team1": "日本U21", "team2": "エジプトU21"}) == "u21"
     assert result_group({"team": "youth", "stage": "U-20W杯 グループA 第1節"}) == "u20"
     assert result_group({"team": "youth", "stage": "アジア大会男子準決勝"}) == "u21"
     assert result_group({"team": "youth", "stage": "国際親善試合"}) is None

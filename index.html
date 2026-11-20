@@ -540,7 +540,7 @@ function groupByDate(matches) {
 // 各放送局バッジにLIVE/録画/再放送をインライン表示する
 // ============================================================
 // 若い世代の年代表記（例：U-17女子、U-21）。大会名から読めなければ「若い世代」
-function youthLabel(stage) {
+function youthLabel(stage, teams) {
   stage = stage || "";
   const women = stage.includes("女子") ? "女子" : "";
   const m = stage.match(/U-?(\d{2})/i);
@@ -548,6 +548,9 @@ function youthLabel(stage) {
   // 2026年アジア大会の男子はU-21日本代表で参加（JFA公式のU-21結果ページで確認）。
   // 大会名に年代が入らないため、ここで補う。次回大会で年代が変わったら見直すこと
   if (/アジア(競技)?大会/.test(stage) && !women) return "U-21";
+  // 親善試合は大会名に年代が入らず、チーム名（「日本U21」など）にだけ付くことがある
+  const t = (teams || "").match(/U-?(\d{2})/i);
+  if (t) return `U-${t[1]}${women}`;
   return "若い世代";
 }
 
@@ -558,7 +561,7 @@ function teamTagHtml(match) {
     return `<span class="team-badge nadeshiko">🇯🇵 なでしこジャパン</span>`;
   }
   if (team === "youth") {
-    return `<span class="team-badge youth">🇯🇵 ${youthLabel(match.stage)}</span>`;
+    return `<span class="team-badge youth">🇯🇵 ${youthLabel(match.stage, `${match.team1 || ""} ${match.team2 || ""}`)}</span>`;
   }
   return "🇯🇵 日本代表戦";
 }
