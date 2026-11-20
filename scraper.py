@@ -311,6 +311,19 @@ def parse_broadcast_table(soup, text_parser=None) -> dict:
     return result
 
 
+def broadcast_undecided(soup) -> bool:
+    """記事に「放送・配信は未決定」と書いてあるか。
+
+    goal.comは、その年の試合が終わって次の試合の放送が決まっていない間、
+    放送表そのものを消して「※2027年の試合のテレビ放送・ネット配信は未決定」
+    のような一文だけを残す（2026-11-18に実際に起きた）。このときは放送表が
+    取れなくても故障ではないので、要確認にしない。
+    """
+    text = soup.get_text("\n", strip=True)
+    return any(("放送" in line or "配信" in line) and "未決定" in line
+               for line in text.splitlines())
+
+
 def utc_iso_to_jst(iso_str: str):
     dt_utc = datetime.datetime.fromisoformat(iso_str.replace("Z", "+00:00"))
     dt_jst = dt_utc.astimezone(datetime.timezone(datetime.timedelta(hours=9)))
@@ -1191,7 +1204,10 @@ def main() -> list:
     soup = fetch_soup(URL)
     broadcasts = parse_broadcast_table(soup)
     if not broadcasts:
-        problems.append("goal.comの放送表から放送局を取得できませんでした（表の構造変化の可能性）")
+        if broadcast_undecided(soup):
+            print("  goal.comの放送予定は「未決定」と書かれているため、放送表なしで続けます")
+        else:
+            problems.append("goal.comの放送表から放送局を取得できませんでした（表の構造変化の可能性）")
     a_matches = merge_matches(schedule, broadcasts, team=TEAM_A, old_matches=old_matches)
     print(f"  A代表: {len(a_matches)}試合（放送表 {len(broadcasts)}行）")
 

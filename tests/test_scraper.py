@@ -11,6 +11,7 @@ from scraper import (
     parse_broadcast_text,
     parse_schedule_table,
     parse_broadcast_table,
+    broadcast_undecided,
     merge_matches,
     detect_new_broadcasts,
     utc_iso_to_jst,
@@ -847,3 +848,21 @@ def test_parse_fifa_matches_converts_to_jst_and_reads_only_finished_scores():
     assert "score1" not in entries[1]
     assert len(entries) == 3  # 日本の出ない試合は入れない
     assert "score1" not in entries[2]  # 試合中（終了以外）のスコアは結果にしない
+
+
+def test_broadcast_undecided_when_table_removed():
+    # 2026-11-18に実際に起きた形: 放送表が消え、「未決定」の一文だけが残る
+    html = """
+    <h2>サッカー日本代表｜テレビ放送・ネット配信予定</h2>
+    <p>※2027年の試合のテレビ放送・ネット配信は未決定</p>
+    """
+    soup = BeautifulSoup(html, "html.parser")
+    assert parse_broadcast_table(soup) == {}
+    assert broadcast_undecided(soup) is True
+
+
+def test_broadcast_undecided_false_without_notice():
+    # 表も「未決定」の一文もない場合は、今までどおり故障として扱う
+    html = "<h2>サッカー日本代表｜テレビ放送・ネット配信予定</h2><p>時間未定</p>"
+    soup = BeautifulSoup(html, "html.parser")
+    assert broadcast_undecided(soup) is False
