@@ -1082,7 +1082,10 @@
       "U-NEXT"
     ],
     "is_japan": true,
-    "score": null,
+    "score": {
+      "home": 1,
+      "away": 2
+    },
     "team": "a",
     "year": 2026
   },
@@ -1121,7 +1124,7 @@
   {
     "date": "11/24",
     "time": "22:00",
-    "stage": "U-17W杯 1st ステージ",
+    "stage": "U-17W杯第2節",
     "team1": "日本",
     "team2": "セルビア",
     "tv_onair": [],
@@ -1137,7 +1140,7 @@
   {
     "date": "11/27",
     "time": "22:00",
-    "stage": "U-17W杯 1st ステージ",
+    "stage": "U-17W杯第3節",
     "team1": "ホンジュラス",
     "team2": "日本",
     "tv_onair": [],
