@@ -1042,7 +1042,10 @@
     "tv_bs": [],
     "tv_net": [],
     "is_japan": true,
-    "score": null,
+    "score": {
+      "home": 0,
+      "away": 2
+    },
     "team": "youth",
     "year": 2026
   },
@@ -1101,7 +1104,10 @@
     "tv_bs": [],
     "tv_net": [],
     "is_japan": true,
-    "score": null,
+    "score": {
+      "home": 0,
+      "away": 0
+    },
     "team": "youth",
     "year": 2026
   },
