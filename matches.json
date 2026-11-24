@@ -1142,7 +1142,10 @@
       "DAZN"
     ],
     "is_japan": true,
-    "score": null,
+    "score": {
+      "home": 0,
+      "away": 1
+    },
     "team": "youth",
     "year": 2026
   },
