@@ -1187,6 +1187,20 @@
     "year": 2026
   },
   {
+    "date": "12/1",
+    "time": "22:00",
+    "stage": "U-17W杯 32強ラウンド",
+    "team1": "韓国",
+    "team2": "日本",
+    "tv_onair": [],
+    "tv_bs": [],
+    "tv_net": [],
+    "is_japan": true,
+    "score": null,
+    "team": "youth",
+    "year": 2026
+  },
+  {
     "date": "12/5",
     "time": "15:00",
     "stage": "MIZUHO BLUE CHALLENGE NADESHIKO 2026",
